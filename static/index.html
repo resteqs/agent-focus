@@ -2194,9 +2194,9 @@
                 <div>
                   <div class="anki-account-badge">
                     <span id="ankiAccountDot" class="sync-dot" aria-hidden="true"></span>
-                    <span id="ankiAccountTitle">Not connected</span>
+                    <span id="ankiAccountTitle">Not signed in</span>
                   </div>
-                  <div id="ankiAccountDesc" class="spec-row-desc">Sync with AnkiWeb without Anki Desktop.</div>
+                  <div id="ankiAccountDesc" class="spec-row-desc">Sign in once. Reviews sync quietly in the background.</div>
                 </div>
               </div>
 
@@ -2213,7 +2213,7 @@
                 </div>
 
                 <details class="anki-advanced">
-                  <summary>Self-hosted sync server</summary>
+                  <summary>Custom sync server</summary>
                   <div class="anki-field">
                     <label for="ankiEndpointInput">Server URL (leave blank for AnkiWeb)</label>
                     <input id="ankiEndpointInput" type="url" class="text-input" placeholder="https://sync.example.com/" autocapitalize="off" spellcheck="false" />
@@ -2223,7 +2223,7 @@
                 <div class="anki-account-actions">
                   <button id="ankiLoginBtn" type="submit" class="btn btn-amber">Sign in</button>
                 </div>
-                <p class="anki-account-note">Your password is sent once to get a sync key and is never stored. Agent Focus keeps its own copy of your collection, separate from Anki Desktop’s.</p>
+                <p class="anki-account-note">Your password is used once to get a sync key and is never saved. Your collection is cached locally in its own folder.</p>
               </form>
 
               <div id="ankiSignedInActions" class="anki-account-actions hidden">
@@ -2946,11 +2946,8 @@
         ankiIndex = 0;
         ankiRevealed = false;
         sessionCombo = ankiData.combo || 0;
-        setSyncDot(ankiData.source !== "offline", {
-          headless: `Synced with ${ankiData.anki_endpoint || "AnkiWeb"}`,
-          ankiconnect: "Connected to Anki Desktop",
-          offline: "Not connected. Reviews stay on this Mac.",
-        }[ankiData.source]);
+        const signedIn = ankiData.signed_in === true;
+        setSyncDot(signedIn, signedIn ? `${ankiData.anki_endpoint || "AnkiWeb"} connected` : "Not signed in");
 
         const countFor = (d) => (ankiStudyMode === "all" ? d.count || 0 : (d.due || 0) + (d.new || 0));
         deckOptions = [
@@ -3030,13 +3027,12 @@
         $("rateWrap").classList.add("hidden");
         if (ankiLoadError) {
           showEmptyState("Couldn’t load cards", "Agent Focus isn’t responding. Check that it’s running, then retry.", ["Retry", loadAnki]);
-        } else if (ankiData.source === "offline") {
-          showEmptyState(
-            "Connect Anki",
-            "Sign in to AnkiWeb in Settings, or open Anki Desktop with AnkiConnect installed.",
-            ["Sign in", goToAnkiSignIn],
-            ["Open Anki Desktop", () => launchAnki($("emptySecondaryBtn"))],
-          );
+        } else if (ankiData.source === "unavailable") {
+          showEmptyState("Connect AnkiWeb", "Run ./install.sh to add the anki package, then sign in in Settings.", ["Sign in to AnkiWeb", goToAnkiSignIn]);
+        } else if (!ankiData.signed_in) {
+          showEmptyState("Connect AnkiWeb", "Sign in once in Settings for silent two-way sync.", ["Sign in to AnkiWeb", goToAnkiSignIn]);
+        } else if (ankiData.source === "error") {
+          showEmptyState("Couldn’t read your cards", "The local Anki cache had a problem. Sync to repair it.", ["Sync", syncAnkiNow]);
         } else if (ankiData.total_cards > 0 && ankiStudyMode !== "all") {
           showEmptyState("Nothing due", "Sync to pull reviews from your phone, or study all cards.", ["Sync", syncAnkiNow], ["Study all cards", () => setStudyMode("all")]);
         } else {
@@ -3096,17 +3092,6 @@
       }
     }
 
-    async function launchAnki(btn) {
-      btn.disabled = true;
-      btn.textContent = "Opening Anki…";
-      try {
-        await postJSON("/api/anki/launch");
-        await loadAnki();
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
     function revealAnki(moveFocus = false) {
       if (!ankiCards.length || ankiRevealed) return;
       sfx("flip");
@@ -3127,7 +3112,7 @@
 
     // The headless store debounces its own sync; this flushes it when the tab closes.
     window.addEventListener("pagehide", () => {
-      if (!ankiHasPendingSync || ankiData?.source !== "headless") return;
+      if (!ankiHasPendingSync || !ankiData?.signed_in) return;
       ankiHasPendingSync = false;
       navigator.sendBeacon("/api/anki/sync?auto=1");
     });
@@ -3214,8 +3199,7 @@
       const res = await fetch("/api/anki/account");
       if (!res.ok) return;
       const info = await res.json();
-      const desktop = info.mode === "ankiconnect";
-      $("ankiAccountDot").classList.toggle("live", info.signed_in || desktop);
+      $("ankiAccountDot").classList.toggle("live", info.signed_in);
       $("ankiLoginForm").classList.toggle("hidden", info.signed_in || !info.available);
       $("ankiSignedInActions").classList.toggle("hidden", !info.signed_in);
 
@@ -3223,11 +3207,11 @@
         $("ankiAccountTitle").textContent = `${info.account || "Signed in"} · ${info.endpoint_label}`;
         $("ankiAccountDesc").textContent = "Reviews sync in the background.";
       } else if (!info.available) {
-        $("ankiAccountTitle").textContent = desktop ? "Using Anki Desktop" : "Anki package not installed";
-        $("ankiAccountDesc").textContent = "Run ./install.sh, or pip install anki, to sync without Anki Desktop.";
+        $("ankiAccountTitle").textContent = "Anki package not installed";
+        $("ankiAccountDesc").textContent = "Run ./install.sh to add it, then sign in here.";
       } else {
-        $("ankiAccountTitle").textContent = desktop ? "Using Anki Desktop" : "Not signed in";
-        $("ankiAccountDesc").textContent = "Sign in to sync with AnkiWeb or your own sync server. Anki Desktop isn’t needed.";
+        $("ankiAccountTitle").textContent = "Not signed in";
+        $("ankiAccountDesc").textContent = "Sign in once. Reviews sync quietly in the background.";
       }
     }
 

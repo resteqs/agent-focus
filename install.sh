@@ -134,4 +134,4 @@ PY
 echo ""
 echo "Agent Focus installed and running at http://127.0.0.1:7842"
 echo "Try: agent-focus demo"
-echo "Sync flashcards without Anki Desktop: agent-focus anki login"
+echo "Sign in to AnkiWeb for flashcards: agent-focus anki login"

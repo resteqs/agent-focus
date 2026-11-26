@@ -7,23 +7,18 @@ tabs over AppleScript and redirects blocked sites to the wait-state page served 
 
 from __future__ import annotations
 
-import html
 import json
 import math
 import mimetypes
 import os
 import queue
 import re
-import shutil
 import signal
-import sqlite3
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 import urllib.parse
-import urllib.request
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -36,8 +31,6 @@ from ankistore import (
     FullSyncConflict,
     SyncError,
     is_auth_error,
-    split_rendered_answer,
-    strip_style,
 )
 
 HOST = "127.0.0.1"
@@ -49,7 +42,6 @@ DATA_DIR = Path(
 CONFIG_PATH = DATA_DIR / "config.json"
 SCRATCHPAD_PATH = DATA_DIR / "scratchpad.md"
 ANKI_PROGRESS_PATH = DATA_DIR / "anki_progress.json"
-ANKICONNECT_URL = os.environ.get("AGENT_FOCUS_ANKICONNECT_URL", "http://127.0.0.1:8765")
 MAX_BODY_BYTES = 1024 * 1024
 HEADLESS_SYNC_DEBOUNCE_SECONDS = 65.0
 
@@ -68,7 +60,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "return_app": "Orca",
     "completion_chime": True,
     "obsidian_note_path": "",
-    "anki_profile_dir": str(Path.home() / "Library/Application Support/Anki2/User 1"),
     "anki_headless_home": str(Path.home() / ".local/share/anki-headless"),
     "anki_headless_profile": "agent-focus",
     "anki_sync_endpoint": "",
@@ -150,28 +141,6 @@ def pid_alive(pid: int) -> bool:
     return True
 
 
-def ankiconnect(action: str, params: dict[str, Any] | None = None, timeout: float = 2.0) -> Any:
-    payload = json.dumps({"action": action, "version": 6, "params": params or {}}).encode("utf-8")
-    req = urllib.request.Request(
-        ANKICONNECT_URL,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-    if data.get("error"):
-        raise RuntimeError(str(data["error"]))
-    return data.get("result")
-
-
-def ankiconnect_alive(timeout: float) -> bool:
-    try:
-        return bool(ankiconnect("version", timeout=timeout))
-    except (OSError, ValueError, RuntimeError):
-        return False
-
-
 def rewrite_media_urls(markup: str) -> str:
     """Point relative <img src> at /api/anki/media/ so the page can load collection media."""
 
@@ -182,18 +151,6 @@ def rewrite_media_urls(markup: str) -> str:
         return f"src={quote}/api/anki/media/{urllib.parse.quote(os.path.basename(src))}{quote}"
 
     return re.sub(r'src=(["\'])([^"\']+)\1', repl, markup)
-
-
-def render_cloze(text: str, card_ord: int, reveal: bool) -> str:
-    def repl(match: re.Match[str]) -> str:
-        idx, answer, hint = int(match.group(1)), match.group(2), match.group(3)
-        if idx != card_ord + 1:
-            return answer
-        if reveal:
-            return f'<span class="cloze-reveal">{answer}</span>'
-        return f'<span class="cloze-blank">[{html.escape(hint) if hint else "…"}]</span>'
-
-    return re.sub(r"\{\{c(\d+)::([^:}]+)(?:::([^}]+))?\}\}", repl, text)
 
 
 class FocusState:
@@ -210,7 +167,6 @@ class FocusState:
         self.intercept_count_today = 0
         self.intercept_day = today()
         self.sse_clients: list[queue.Queue[str]] = []
-        self.anki_cache: dict[str, Any] = {"mtime": 0.0, "decks": [], "cards": []}
         self.anki_progress = self._load_anki_progress()
         self._anki_sync_timer: threading.Timer | None = None
         self._anki_dirty = False
@@ -245,7 +201,6 @@ class FocusState:
             "combo": 0,
             "streak_days": 0,
             "last_study_day": "",
-            "cards": {},
         }
         if ANKI_PROGRESS_PATH.exists():
             try:
@@ -458,19 +413,16 @@ class FocusState:
                 },
             }
 
-    # Anki: headless store first, then AnkiConnect, then a read-only copy of Anki Desktop's collection.
-
-    def _anki_profile_dir(self) -> Path:
-        return Path(self.config["anki_profile_dir"]).expanduser()
+    # Anki: the headless AnkiStore (official `anki` package) is the only backend.
 
     def anki_account_status(self) -> dict[str, Any]:
         info = self.anki_store.auth_info()
-        if info["signed_in"]:
+        if not info["available"]:
+            mode = "unavailable"
+        elif info["signed_in"]:
             mode = "headless"
-        elif ankiconnect_alive(timeout=0.35):
-            mode = "ankiconnect"
         else:
-            mode = "offline"
+            mode = "signed_out"
         return {**info, "mode": mode, "endpoint_label": info["endpoint"] or "AnkiWeb"}
 
     def login_anki(self, email: str, password: str, endpoint: str | None = None) -> dict[str, Any]:
@@ -504,32 +456,22 @@ class FocusState:
             self._cancel_sync_timer_locked()
             self._anki_dirty = False
 
-        if self.anki_store.is_authenticated():
-            try:
-                res = self.anki_store.sync(media=media, on_conflict=on_conflict)
-            except Exception as e:  # network, auth, and rslib errors all end up here
-                with self.lock:
-                    self._anki_dirty = True
-                log(f"Headless Anki sync failed: {e}")
-                return False, {
-                    "mode": "headless",
-                    "error": str(e),
-                    "conflict": isinstance(e, FullSyncConflict),
-                    "auth_error": is_auth_error(e),
-                }
-            log(f"Headless Anki sync complete: {res['required']}")
-            return True, {"mode": "headless", **res}
-
-        # AnkiConnect's `sync` calls mw.onSync(), which pops a "Sync complete" dialog in
-        # Anki Desktop. Only run it when the user asked for a sync, never in the background.
-        if only_if_dirty:
-            return True, {"skipped": True}
+        if not self.anki_store.is_authenticated():
+            return False, {"mode": "signed_out", "error": "Sign in to AnkiWeb first"}
         try:
-            ankiconnect("sync", timeout=10.0)
-        except (OSError, ValueError, RuntimeError) as e:
-            log(f"AnkiConnect sync failed: {e}")
-            return False, {"error": str(e), "mode": "ankiconnect"}
-        return True, {"mode": "ankiconnect"}
+            res = self.anki_store.sync(media=media, on_conflict=on_conflict)
+        except Exception as e:  # network, auth, and rslib errors all end up here
+            with self.lock:
+                self._anki_dirty = True
+            log(f"Anki sync failed: {e}")
+            return False, {
+                "mode": "headless",
+                "error": str(e),
+                "conflict": isinstance(e, FullSyncConflict),
+                "auth_error": is_auth_error(e),
+            }
+        log(f"Anki sync complete: {res['required']}")
+        return True, {"mode": "headless", **res}
 
     def _schedule_headless_sync(self) -> None:
         with self.lock:
@@ -577,231 +519,52 @@ class FocusState:
         self._save_anki_progress()
         return {"gained_xp": gained, **self._study_stats_locked()}
 
-    def _get_anki_via_connect(self, deck_filter: str, study_mode: str) -> dict[str, Any] | None:
-        if not ankiconnect_alive(timeout=0.6):
-            return None
-        try:
-            deck_names: list[str] = ankiconnect("deckNames") or []
-            deck_stats: dict[str, Any] = ankiconnect("getDeckStats", {"decks": deck_names}) or {}
-            stats_by_name = {v.get("name"): v for v in deck_stats.values()}
-            decks = []
-            for name in sorted(deck_names):
-                st = stats_by_name.get(name, {})
-                total = int(st.get("total_in_deck", 0))
-                if total == 0 and name == "Default" and len(deck_names) > 1:
-                    continue
-                decks.append(
-                    {
-                        "name": name,
-                        "label": name.replace("::", " / "),
-                        "count": total,
-                        "due": int(st.get("review_count", 0)) + int(st.get("learn_count", 0)),
-                        "new": int(st.get("new_count", 0)),
-                    }
-                )
-
-            def find(query: str) -> list[int]:
-                return ankiconnect("findCards", {"query": query}) or []
-
-            deck_q = ""
-            if deck_filter and deck_filter != "ALL":
-                deck_q = 'deck:"{}" '.format(deck_filter.replace('"', '\\"'))
-            if study_mode == "all":
-                card_ids = find(f"{deck_q}-is:suspended")
-            else:
-                card_ids = list(dict.fromkeys(find(f"{deck_q}(is:due OR is:learn) -is:suspended") + find(f"{deck_q}is:new -is:suspended")))
-            card_ids = card_ids[:100]
-            infos = ankiconnect("cardsInfo", {"cards": card_ids}) if card_ids else []
-
-            cards = []
-            for info in infos or []:
-                front = strip_style(str(info.get("question") or ""))
-                back = split_rendered_answer(str(info.get("answer") or ""))
-                fields = sorted((info.get("fields") or {}).values(), key=lambda f: f.get("order", 0))
-                if not front and fields:
-                    front = fields[0].get("value", "")
-                    back = fields[1].get("value", "") if len(fields) > 1 else ""
-                deck_raw = str(info.get("deckName") or "Default")
-                next_reviews = info.get("nextReviews")
-                cards.append(
-                    {
-                        "id": str(info.get("cardId")),
-                        "nid": str(info.get("note")),
-                        "deck": deck_raw.replace("::", " / "),
-                        "deck_raw": deck_raw,
-                        "notetype": str(info.get("modelName") or "Basic"),
-                        "queue": int(info.get("queue", 0)),
-                        "ivl": int(info.get("interval", 0)),
-                        "reps": int(info.get("reps", 0)),
-                        "front": front,
-                        "back": back,
-                        "next_reviews": next_reviews if isinstance(next_reviews, list) else [],
-                    }
-                )
-
-            return {
-                "source": "ankiconnect",
-                "study_mode": study_mode,
-                "decks": decks,
-                "total_cards": len(find("-is:suspended")),
-                "total_due": len(find("(is:due OR is:learn) -is:suspended")),
-                "total_new": len(find("is:new -is:suspended")),
-                "filtered_count": len(cards),
-                "reviewed_today": int(ankiconnect("getNumCardsReviewedToday") or 0),
-                "cards": cards,
-            }
-        except (OSError, ValueError, RuntimeError) as e:
-            log(f"AnkiConnect query failed, using offline snapshot: {e}")
-            return None
-
-    def _load_anki_snapshot(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        db_path = self._anki_profile_dir() / "collection.anki2"
-        if not db_path.exists():
-            return [], []
-        mtime = db_path.stat().st_mtime
-        with self.lock:
-            if self.anki_cache["mtime"] == mtime and self.anki_cache["cards"]:
-                return self.anki_cache["decks"], self.anki_cache["cards"]
-
-        cards: list[dict[str, Any]] = []
-        deck_counts: dict[str, int] = {}
-        # Read a copy so a running Anki Desktop never sees a lock from us.
-        with tempfile.NamedTemporaryFile(suffix=".anki2") as tf:
-            shutil.copy2(db_path, tf.name)
-            con = sqlite3.connect(f"file:{tf.name}?mode=ro", uri=True)
-            con.create_collation("unicase", lambda a, b: (a.lower() > b.lower()) - (a.lower() < b.lower()))
-            try:
-                deck_map = {did: name.replace("\x1f", "::") for did, name in con.execute("SELECT id, name FROM decks")}
-                notetype_map = dict(con.execute("SELECT id, name FROM notetypes"))
-                rows = con.execute(
-                    """
-                    SELECT c.id, c.nid, c.did, c.ord, c.queue, c.ivl, n.mid, n.flds
-                    FROM cards c JOIN notes n ON n.id = c.nid
-                    WHERE c.queue != -1
-                    ORDER BY c.queue DESC, c.due ASC, c.id ASC
-                    """
-                )
-                for cid, nid, did, card_ord, c_queue, ivl, mid, flds in rows:
-                    parts = flds.split("\x1f") + ["", ""]
-                    front_raw, back_raw, extra_raw = parts[0], parts[1], parts[2]
-                    nt_name = notetype_map.get(mid, "Basic")
-                    deck_raw = deck_map.get(did, "Default")
-
-                    # "Lückentext" is the German cloze notetype name.
-                    if "{{c" in front_raw or "cloze" in nt_name.lower() or "lücken" in nt_name.lower():
-                        front_html = render_cloze(front_raw, card_ord, reveal=False)
-                        back_html = render_cloze(front_raw, card_ord, reveal=True)
-                        extra = back_raw
-                    else:
-                        reverse = card_ord == 1 and back_raw.strip()
-                        front_html, back_html = (back_raw, front_raw) if reverse else (front_raw, back_raw)
-                        extra = extra_raw
-                    if extra.strip():
-                        back_html += f'<div class="anki-extra">{extra}</div>'
-                    if not front_html.strip() and not back_html.strip():
-                        continue
-
-                    deck_counts[deck_raw] = deck_counts.get(deck_raw, 0) + 1
-                    cards.append(
-                        {
-                            "id": str(cid),
-                            "nid": str(nid),
-                            "deck": deck_raw.replace("::", " / "),
-                            "deck_raw": deck_raw,
-                            "notetype": nt_name,
-                            "queue": c_queue,
-                            "ivl": ivl,
-                            "front": front_html,
-                            "back": back_html,
-                            "next_reviews": [],
-                        }
-                    )
-            finally:
-                con.close()
-
-        decks = [
-            {"name": name, "label": name.replace("::", " / "), "count": cnt, "due": cnt, "new": 0}
-            for name, cnt in sorted(deck_counts.items())
-        ]
-        with self.lock:
-            self.anki_cache = {"mtime": mtime, "decks": decks, "cards": cards}
-        return decks, cards
-
     def _use_headless(self) -> bool:
         return self.anki_store.is_authenticated() and self.anki_store.col_path.exists()
+
+    def _empty_anki_payload(self, study_mode: str) -> dict[str, Any]:
+        return {
+            "source": "signed_out" if ANKI_AVAILABLE else "unavailable",
+            "signed_in": False,
+            "study_mode": study_mode,
+            "decks": [],
+            "total_cards": 0,
+            "total_due": 0,
+            "total_new": 0,
+            "filtered_count": 0,
+            "reviewed_today": 0,
+            "cards": [],
+        }
 
     def get_anki_payload(self, deck_filter: str = "ALL", study_mode: str = "due") -> dict[str, Any]:
         with self.lock:
             stats = self._study_stats_locked()
-            reviewed_offline = int(self.anki_progress["reviewed_today"])
-
-        payload = None
-        if self._use_headless():
-            try:
-                payload = self.anki_store.get_cards_payload(deck_filter, study_mode)
-            except Exception as e:  # a broken cache shouldn't hide AnkiConnect or the snapshot
-                log(f"Headless Anki query failed, falling back: {e}")
-        if payload is None:
-            payload = self._get_anki_via_connect(deck_filter, study_mode)
-        if payload is None:
-            decks, cards = self._load_anki_snapshot()
-            filtered = [
-                c for c in cards
-                if deck_filter in ("", "ALL") or c["deck_raw"] == deck_filter or c["deck_raw"].startswith(deck_filter + "::")
-            ]
-            payload = {
-                "source": "offline",
-                "study_mode": study_mode,
-                "decks": decks,
-                "total_cards": len(cards),
-                "total_due": len(cards),
-                "total_new": 0,
-                "filtered_count": len(filtered),
-                "reviewed_today": reviewed_offline,
-                "cards": filtered,
-            }
+        if not self._use_headless():
+            return {**self._empty_anki_payload(study_mode), **stats}
+        try:
+            payload = self.anki_store.get_cards_payload(deck_filter, study_mode)
+        except Exception as e:  # a broken local cache shouldn't take down the page
+            log(f"Anki query failed: {e}")
+            return {**self._empty_anki_payload(study_mode), "source": "error", "signed_in": True, "error": str(e), **stats}
         for card in payload["cards"]:
             card["front"] = rewrite_media_urls(card["front"])
             card["back"] = rewrite_media_urls(card["back"])
-        return {**payload, **stats}
+        return {**payload, "signed_in": True, **stats}
 
-    def record_anki_review(self, card_id: str, ease: str) -> dict[str, Any]:
-        rating = EASES.index(ease) + 1
+    def record_anki_review(self, card_id: str, ease: str) -> tuple[int, dict[str, Any]]:
+        if not self._use_headless():
+            return 400, {"ok": False, "error": "Sign in to AnkiWeb first"}
+        try:
+            with self.anki_store.session() as col:
+                AnkiStore.answer(col, int(card_id), EASES.index(ease) + 1)
+                reviewed_today = AnkiStore.reviewed_today(col)
+        except Exception as e:  # e.g. the card was deleted on another device
+            log(f"Anki answer failed: {e}")
+            return 409, {"ok": False, "error": f"Could not record review: {e}"}
         with self.lock:
             xp_stats = self._award_study_xp_locked(ease)
-
-        if self._use_headless():
-            try:
-                with self.anki_store.session() as col:
-                    AnkiStore.answer(col, int(card_id), rating)
-                    reviewed_today = AnkiStore.reviewed_today(col)
-            except Exception as e:  # e.g. the card was deleted on another device
-                log(f"Headless Anki answer failed, falling back: {e}")
-            else:
-                self._schedule_headless_sync()
-                return {"ok": True, "synced": True, "source": "headless", "reviewed_today": reviewed_today, **xp_stats}
-
-        try:
-            res = ankiconnect("answerCards", {"answers": [{"cardId": int(card_id), "ease": rating}]}, timeout=2.5)
-            if isinstance(res, list) and res and res[0]:
-                reviewed_today = int(ankiconnect("getNumCardsReviewedToday") or 0)
-                return {"ok": True, "synced": True, "source": "ankiconnect", "reviewed_today": reviewed_today, **xp_stats}
-        except (OSError, ValueError, RuntimeError) as e:
-            log(f"AnkiConnect answerCards failed, recording offline: {e}")
-
-        intervals = {"again": 45, "hard": 300, "good": 86400, "easy": 86400 * 4}
-        now = time.time()
-        with self.lock:
-            self.anki_progress["reviewed_today"] = int(self.anki_progress["reviewed_today"]) + 1
-            cards_map = self.anki_progress.setdefault("cards", {})
-            cards_map[card_id] = {
-                "reps": int(cards_map.get(card_id, {}).get("reps", 0)) + 1,
-                "last_ease": ease,
-                "reviewed_at": now,
-                "due_at": now + intervals[ease],
-            }
-            self._save_anki_progress()
-            return {"ok": True, "synced": False, "source": "offline", "reviewed_today": self.anki_progress["reviewed_today"], **xp_stats}
+        self._schedule_headless_sync()
+        return 200, {"ok": True, "synced": True, "source": "headless", "reviewed_today": reviewed_today, **xp_stats}
 
 
 STATE = FocusState()
@@ -998,8 +761,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         if name in ("", ".", "..") or name != os.path.basename(name) or "\x00" in name:
             self.send_error(HTTPStatus.BAD_REQUEST)
             return
-        headless = STATE.anki_store.media_dir / name
-        self._serve_file(headless if headless.exists() else STATE._anki_profile_dir() / "collection.media" / name)
+        self._serve_file(STATE.anki_store.media_dir / name)
 
     def do_POST(self) -> None:
         if self._foreign_request():
@@ -1148,7 +910,7 @@ def post_anki_review(body: dict[str, Any], _qs: dict[str, list[str]]) -> tuple[i
         raise BadRequest("card_id must be a numeric Anki card id")
     if ease not in EASES:
         raise BadRequest(f"ease must be one of {', '.join(EASES)}")
-    return 200, STATE.record_anki_review(card_id, ease)
+    return STATE.record_anki_review(card_id, ease)
 
 
 @post_route("/api/anki/login")
@@ -1181,6 +943,8 @@ def post_anki_sync(body: dict[str, Any], qs: dict[str, list[str]]) -> tuple[int,
     ok, info = STATE.flush_anki_sync(only_if_dirty=auto_only, media=bool(body.get("media", not auto_only)), on_conflict=on_conflict)
     if ok:
         return 200, {"ok": True, **info}
+    if info.get("mode") == "signed_out":
+        return 400, {"ok": False, **info}
     return (409 if info.get("conflict") else 401 if info.get("auth_error") else 503), {"ok": False, **info}
 
 
@@ -1194,19 +958,6 @@ def post_focus_app(body: dict[str, Any], _qs: dict[str, list[str]]) -> tuple[int
     except OSError as e:
         return 500, {"ok": False, "error": str(e)}
     return 200, {"ok": True, "app": app_name}
-
-
-@post_route("/api/anki/launch")
-def post_anki_launch(_body: dict[str, Any], _qs: dict[str, list[str]]) -> tuple[int, Any]:
-    try:
-        subprocess.Popen(["/usr/bin/open", "-g", "-j", "-a", "/Applications/Anki.app"])
-    except OSError as e:
-        return 500, {"ok": False, "error": str(e)}
-    for _ in range(10):
-        time.sleep(0.5)
-        if ankiconnect_alive(timeout=0.5):
-            return 200, {"ok": True, "ankiconnect": True}
-    return 200, {"ok": True, "ankiconnect": False}
 
 
 class FocusHTTPServer(ThreadingHTTPServer):

@@ -231,11 +231,12 @@ class SyncServerTest(unittest.TestCase):
         state.anki_store = store
         with mock.patch.object(server, "log"):
             payload = state.get_anki_payload("ALL", "due")
-            review = state.record_anki_review(payload["cards"][0]["id"], "good")
+            status, review = state.record_anki_review(payload["cards"][0]["id"], "good")
             state._cancel_sync_timer_locked()
         self.assertEqual(payload["source"], "headless")
         self.assertIn('src="/api/anki/media/pic%20one.png"', payload["cards"][0]["back"])
-        self.assertEqual((review["source"], review["reviewed_today"]), ("headless", 1))
+        self.assertEqual((status, review["source"], review["reviewed_today"]), (200, "headless", 1))
+        self.assertTrue(payload["signed_in"])
         self.assertTrue(state._anki_dirty)
 
     @staticmethod

@@ -1,6 +1,6 @@
 """Headless Anki collection for Agent Focus, built on the official `anki` package (no Qt).
 
-Keeps its own collection and auth.json under `<home>/<profile>/`, never Anki Desktop's.
+Keeps its own collection and auth.json under `<home>/<profile>/`.
 auth.json holds the sync key and endpoint, never the password, and is created 0600.
 
     store = AnkiStore(home="~/.local/share/anki-headless", profile="agent-focus")
@@ -30,7 +30,7 @@ try:
 
     ANKI_AVAILABLE = True
     RATING = {1: CardAnswer.AGAIN, 2: CardAnswer.HARD, 3: CardAnswer.GOOD, 4: CardAnswer.EASY}
-except ImportError:  # the server still runs on stdlib Python, with AnkiConnect or the offline snapshot
+except ImportError:  # the server still runs on stdlib Python, without flashcards
     ANKI_AVAILABLE = False
     Collection = Any  # type: ignore[misc,assignment]
     SyncError = RuntimeError  # type: ignore[misc,assignment]

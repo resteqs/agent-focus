@@ -1,2 +1,2 @@
-# Optional. Lets Agent Focus sync with AnkiWeb or a self-hosted server without Anki Desktop.
+# Required for flashcards. Lets Agent Focus sync with AnkiWeb or a self-hosted Anki sync server.
 anki>=26.9

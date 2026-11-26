@@ -45,7 +45,7 @@ def isolated_state(test: unittest.TestCase) -> server.FocusState:
 
 class SandboxTest(unittest.TestCase):
     def test_data_paths_never_point_at_the_real_home(self):
-        for path in (server.DATA_DIR, server.STATE.anki_store.home, server.STATE._anki_profile_dir()):
+        for path in (server.DATA_DIR, server.STATE.anki_store.home, server.STATE.anki_store.media_dir):
             self.assertTrue(str(path).startswith(str(support.SANDBOX)), path)
             self.assertFalse(str(path).startswith(str(HOME_DATA)), path)
 
@@ -219,12 +219,87 @@ class HeadlessSyncFlagTest(unittest.TestCase):
         self.assertEqual(info["error"], "offline")
         self.assertTrue(state._anki_dirty)
 
-    def test_background_flush_never_calls_ankiconnect_sync(self):
+    def test_clean_flush_is_skipped(self):
+        state = isolated_state(self)
+        with mock.patch.object(state.anki_store, "sync") as sync:
+            self.assertEqual(state.flush_anki_sync(only_if_dirty=True), (True, {"skipped": True}))
+        sync.assert_not_called()
+
+    def test_signed_out_flush_never_syncs(self):
         state = isolated_state(self)
         state._anki_dirty = True
-        with mock.patch.object(server, "ankiconnect") as connect:
-            self.assertEqual(state.flush_anki_sync(only_if_dirty=True), (True, {"skipped": True}))
-        connect.assert_not_called()
+        with mock.patch.object(state.anki_store, "sync") as sync:
+            ok, info = state.flush_anki_sync(only_if_dirty=False)
+        sync.assert_not_called()
+        self.assertEqual((ok, info["mode"]), (False, "signed_out"))
+
+    def test_successful_sync_clears_pending_flag(self):
+        state = isolated_state(self)
+        state._anki_dirty = True
+        with mock.patch.object(state.anki_store, "is_authenticated", return_value=True), \
+                mock.patch.object(state.anki_store, "sync", return_value={"required": "normal"}) as sync:
+            ok, info = state.flush_anki_sync(only_if_dirty=True, media=False)
+        sync.assert_called_once_with(media=False, on_conflict="raise")
+        self.assertEqual((ok, info["mode"]), (True, "headless"))
+        self.assertFalse(state._anki_dirty)
+
+    def test_headless_review_schedules_debounced_silent_sync(self):
+        state = isolated_state(self)
+        self.assertGreaterEqual(server.HEADLESS_SYNC_DEBOUNCE_SECONDS, 65)
+        with mock.patch.object(state, "_use_headless", return_value=True), \
+                mock.patch.object(state.anki_store, "session") as session, \
+                mock.patch.object(server.AnkiStore, "answer") as answer, \
+                mock.patch.object(server.AnkiStore, "reviewed_today", return_value=3), \
+                mock.patch.object(server.threading, "Timer") as timer:
+            status, data = state.record_anki_review("1234", "easy")
+        col = session.return_value.__enter__.return_value
+        answer.assert_called_once_with(col, 1234, 4)
+        self.assertEqual((status, data["source"], data["reviewed_today"], data["gained_xp"]), (200, "headless", 3, 20))
+        self.assertEqual(timer.call_args.args[0], server.HEADLESS_SYNC_DEBOUNCE_SECONDS)
+        self.assertEqual(timer.call_args.kwargs["kwargs"], {"only_if_dirty": True, "media": False})
+        timer.return_value.start.assert_called_once()
+        self.assertTrue(state._anki_dirty)
+
+    def test_failed_headless_review_awards_no_xp(self):
+        state = isolated_state(self)
+        with mock.patch.object(state, "_use_headless", return_value=True), \
+                mock.patch.object(state.anki_store, "session", side_effect=RuntimeError("card gone")):
+            status, data = state.record_anki_review("1234", "good")
+        self.assertEqual((status, data["ok"]), (409, False))
+        self.assertEqual(state.anki_progress["xp_today"], 0)
+        self.assertFalse(state._anki_dirty)
+
+
+class AnkiStatusTest(unittest.TestCase):
+    def test_modes(self):
+        state = isolated_state(self)
+        base = {"available": True, "signed_in": False, "endpoint": None, "account": "", "profile": "p", "has_collection": False}
+        cases = [
+            ({**base, "available": False}, "unavailable", "AnkiWeb"),
+            (base, "signed_out", "AnkiWeb"),
+            ({**base, "signed_in": True, "endpoint": "https://sync.example.com/"}, "headless", "https://sync.example.com/"),
+        ]
+        for info, mode, label in cases:
+            with self.subTest(mode=mode), mock.patch.object(state.anki_store, "auth_info", return_value=info):
+                status = state.anki_account_status()
+                self.assertEqual((status["mode"], status["endpoint_label"]), (mode, label))
+                self.assertEqual(
+                    set(status),
+                    {"available", "signed_in", "endpoint", "account", "profile", "has_collection", "mode", "endpoint_label"},
+                )
+
+    def test_unavailable_payload(self):
+        state = isolated_state(self)
+        with mock.patch.object(server, "ANKI_AVAILABLE", False):
+            payload = state.get_anki_payload()
+        self.assertEqual((payload["source"], payload["signed_in"], payload["cards"]), ("unavailable", False, []))
+
+    def test_broken_cache_returns_clean_empty_payload(self):
+        state = isolated_state(self)
+        with mock.patch.object(state, "_use_headless", return_value=True), \
+                mock.patch.object(state.anki_store, "get_cards_payload", side_effect=RuntimeError("db locked")):
+            payload = state.get_anki_payload()
+        self.assertEqual((payload["source"], payload["cards"], payload["total_cards"]), ("error", [], 0))
 
 
 class HttpApiTest(unittest.TestCase):
@@ -348,11 +423,19 @@ class HttpApiTest(unittest.TestCase):
         self.assertTrue(text.startswith("# Agent Scratchpad\n"))
         self.assertLess(text.index("first"), text.index("second"))
 
-    def test_offline_review_awards_xp(self):
+    def test_review_is_rejected_when_signed_out(self):
         status, data = self.post("/api/anki/review", {"card_id": "1234", "ease": "good"})
-        self.assertEqual(status, 200)
-        self.assertEqual((data["source"], data["synced"], data["reviewed_today"], data["gained_xp"]), ("offline", False, 1, 15))
-        self.assertEqual(self.state.anki_progress["cards"]["1234"]["last_ease"], "good")
+        self.assertEqual((status, data), (400, {"ok": False, "error": "Sign in to AnkiWeb first"}))
+        self.assertEqual(self.state.anki_progress["xp_today"], 0)
+        self.assertFalse(self.state._anki_dirty)
+
+    def test_sync_is_rejected_when_signed_out(self):
+        status, data = self.post("/api/anki/sync", {})
+        self.assertEqual((status, data["ok"], data["mode"]), (400, False, "signed_out"))
+        self.assertEqual(self.post("/api/anki/sync?auto=1")[1], {"ok": True, "skipped": True})
+
+    def test_removed_launch_route_is_gone(self):
+        self.assertEqual(self.post("/api/anki/launch")[0], 404)
 
     def test_review_input_is_validated(self):
         for body in ({"card_id": "", "ease": "good"}, {"card_id": "12; DROP", "ease": "good"}, {"card_id": "12", "ease": "meh"}):
@@ -360,15 +443,22 @@ class HttpApiTest(unittest.TestCase):
                 self.assertEqual(self.post("/api/anki/review", body)[0], 400)
         self.assertEqual(self.state.anki_progress["xp_today"], 0)
 
-    def test_cards_fall_back_to_empty_offline_payload(self):
+    def test_cards_return_clean_signed_out_payload(self):
         status, data = self.request("GET", "/api/anki/cards?deck=ALL&mode=due")
         self.assertEqual(status, 200)
-        self.assertEqual((data["source"], data["cards"]), ("offline", []))
+        for key in ("xp_today", "combo", "streak_days"):
+            self.assertIn(key, data)
+        expected = {
+            "source": "signed_out", "signed_in": False, "decks": [], "cards": [],
+            "total_cards": 0, "total_due": 0, "total_new": 0, "filtered_count": 0, "reviewed_today": 0,
+        }
+        self.assertEqual({k: data[k] for k in expected}, expected)
 
     def test_account_reports_signed_out(self):
         status, data = self.request("GET", "/api/anki/account")
         self.assertEqual(status, 200)
-        self.assertEqual((data["signed_in"], data["mode"], data["endpoint_label"]), (False, "offline", "AnkiWeb"))
+        self.assertEqual((data["signed_in"], data["mode"], data["endpoint_label"]), (False, "signed_out", "AnkiWeb"))
+        self.assertTrue(data["available"])
 
     def test_login_requires_credentials(self):
         self.assertEqual(self.post("/api/anki/login", {"email": "a@example.com"})[0], 400)

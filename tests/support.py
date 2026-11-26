@@ -23,14 +23,11 @@ DATA_DIR = SANDBOX / "data"
 DATA_DIR.mkdir()
 os.environ["AGENT_FOCUS_DATA_DIR"] = str(DATA_DIR)
 os.environ["ANKI_HEADLESS_HOME"] = str(SANDBOX / "anki-headless")
-# Nothing listens on the discard port, so AnkiConnect is always unreachable in tests.
-os.environ["AGENT_FOCUS_ANKICONNECT_URL"] = "http://127.0.0.1:9"
 os.environ.pop("ANKI_SYNC_ENDPOINT", None)
 
 
 def write_config(data_dir: Path, **overrides: object) -> None:
     config = {
-        "anki_profile_dir": str(SANDBOX / "anki-desktop"),
         "anki_headless_home": str(SANDBOX / "anki-headless"),
         "obsidian_note_path": "",
         **overrides,
