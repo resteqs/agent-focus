@@ -1,0 +1,29 @@
+{
+  "port": 7842,
+  "poll_interval_ms": 450,
+  "session_ttl_seconds": 1500,
+  "default_bypass_seconds": 120,
+  "bypass_cooldown_seconds": 30,
+  "auto_restore": true,
+  "completion_chime": true,
+  "obsidian_note_path": "",
+  "anki_profile_dir": "~/Library/Application Support/Anki2/User 1",
+  "blocked_domains": [
+    "mail.proton.me",
+    "reddit.com",
+    "linkedin.com",
+    "news.ycombinator.com",
+    "x.com",
+    "twitter.com",
+    "instagram.com",
+    "youtube.com",
+    "nytimes.com",
+    "bbc.com",
+    "theguardian.com",
+    "reuters.com",
+    "techcrunch.com",
+    "theverge.com",
+    "arstechnica.com",
+    "lobste.rs"
+  ]
+}

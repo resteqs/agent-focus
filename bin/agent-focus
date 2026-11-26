@@ -1,0 +1,67 @@
+#!/bin/sh
+# CLI helper for Agent Focus (http://127.0.0.1:7842)
+
+PORT="${AGENT_FOCUS_PORT:-7842}"
+BASE="http://127.0.0.1:${PORT}"
+DATA_DIR="${AGENT_FOCUS_DATA_DIR:-$HOME/.local/share/agent-focus}"
+PLIST="$HOME/Library/LaunchAgents/com.agent-focus.daemon.plist"
+LEGACY_PLIST="$HOME/Library/LaunchAgents/com.antoni.agent-focus.plist"
+PY_BIN="$(command -v python3 2>/dev/null || echo /opt/homebrew/bin/python3)"
+
+case "${1:-status}" in
+  status)
+    curl -s "$BASE/api/status" | "$PY_BIN" -m json.tool 2>/dev/null || echo "Agent Focus daemon is not running."
+    ;;
+  on)
+    curl -s -X POST -H "Content-Type: application/json" -d '{"enabled":true}' "$BASE/api/focus" >/dev/null && echo "Always-block ON."
+    ;;
+  off)
+    curl -s -X POST -H "Content-Type: application/json" -d '{"enabled":false}' "$BASE/api/focus" >/dev/null && echo "Always-block OFF."
+    ;;
+  clear)
+    curl -s -X POST "$BASE/api/agent/clear" >/dev/null && echo "Cleared all active agent sessions."
+    ;;
+  pause)
+    MINS="${2:-10}"
+    SECS=$((MINS * 60))
+    curl -s -X POST -H "Content-Type: application/json" -d "{\"seconds\":$SECS}" "$BASE/api/pause" >/dev/null && echo "Paused blocking for ${MINS} min."
+    ;;
+  resume)
+    curl -s -X POST -H "Content-Type: application/json" -d '{"seconds":0}' "$BASE/api/pause" >/dev/null && echo "Resumed blocking."
+    ;;
+  open)
+    open "$BASE"
+    ;;
+  demo)
+    SECS="${2:-35}"
+    SID="demo-$(date +%s)"
+    curl -s -X POST -H "Content-Type: application/json" \
+      -d "{\"session_id\":\"claude:$SID\",\"agent\":\"claude\",\"cwd\":\"$PWD\"}" \
+      "$BASE/api/agent/start" >/dev/null
+    open -a Safari "$BASE/?from=https%3A%2F%2Fmail.proton.me&domain=mail.proton.me&t=$(date +%s)"
+    echo "Demo run started (claude:$SID) for ${SECS}s. Safari opened to the wait-state screen."
+    (
+      sleep "$SECS"
+      curl -s -X POST -H "Content-Type: application/json" \
+        -d "{\"session_id\":\"claude:$SID\",\"agent\":\"claude\"}" \
+        "$BASE/api/agent/stop" >/dev/null 2>&1
+    ) >/dev/null 2>&1 &
+    ;;
+  restart)
+    if [ -f "$PLIST" ]; then
+      launchctl kickstart -k "gui/$(id -u)/com.agent-focus.daemon" 2>/dev/null || {
+        launchctl bootout "gui/$(id -u)" "$PLIST" 2>/dev/null || true
+        launchctl bootstrap "gui/$(id -u)" "$PLIST"
+      }
+    elif [ -f "$LEGACY_PLIST" ]; then
+      launchctl kickstart -k "gui/$(id -u)/com.antoni.agent-focus" 2>/dev/null || true
+    fi
+    echo "Restarted Agent Focus."
+    ;;
+  logs)
+    tail -n 40 "$DATA_DIR/server.log" 2>/dev/null || echo "No logs yet."
+    ;;
+  *)
+    echo "Usage: agent-focus [status|demo [secs]|on|off|clear|pause [mins]|resume|open|restart|logs]"
+    ;;
+esac

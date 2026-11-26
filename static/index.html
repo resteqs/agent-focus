@@ -1,0 +1,3336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Focus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      /* Fixed z-index scale */
+      --z-nav: 100;
+      --z-popover: 150;
+      --z-modal: 200;
+      --z-toast: 300;
+
+      /* Emil easing curve tokens (techniques.md) */
+      --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
+      --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+      --ease-enter: cubic-bezier(0.32, 0.72, 0, 1);
+      --ease-icon-swap: cubic-bezier(0.25, 0.1, 0, 1);
+      --ease-in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
+
+      /* Two families only: grotesque for display + UI, mono for paths/keys */
+      --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+      --weight-normal: 400;
+      --weight-medium: 500;
+      --weight-semibold: 600;
+
+      /* Type scale */
+      --text-xs: 12px;
+      --text-sm: 14px;
+      --text-base: 16px;
+      --text-lg: 20px;
+      --text-card: 24px;
+      --text-display: 52px;
+
+      /* Density-aware hairline */
+      --hairline: 1px;
+
+      /* Warm paper + charcoal scale in OKLCH (fixed warm hue 82°) */
+      --paper-1: oklch(0.972 0.008 82);
+      --paper-2: oklch(0.942 0.010 82);
+      --paper-3: oklch(0.910 0.011 82);
+      --paper-raised: oklch(0.992 0.004 82);
+
+      --ink-12: oklch(0.180 0.010 80);
+      --ink-11: oklch(0.365 0.011 80);
+      --ink-9: oklch(0.440 0.011 80);
+      --ink-line: oklch(0.180 0.010 80 / 0.13);
+      --ink-line-strong: oklch(0.180 0.010 80 / 0.24);
+
+      /* Left focus rail — compact deep warm charcoal */
+      --stage-bg: oklch(0.145 0.008 80);
+      --stage-surface: oklch(0.198 0.009 80);
+      --stage-ink: oklch(0.955 0.007 82);
+      --stage-muted: oklch(0.755 0.009 82);
+      --stage-line: oklch(0.955 0.007 82 / 0.14);
+      --stage-focus: oklch(0.955 0.007 82);
+
+      /* Floating card on left rail */
+      --card-bg: oklch(0.978 0.007 82);
+      --card-ink: oklch(0.180 0.010 80);
+      --card-muted: oklch(0.420 0.010 80);
+      --card-focus: oklch(0.180 0.010 80);
+
+      /* Sunlit amber primary accent (Daylight DC-1) */
+      --amber: oklch(0.750 0.168 68);
+      --amber-hover: color-mix(in oklch, var(--amber) 90%, oklch(0.22 0.05 55));
+      --amber-ink: oklch(0.160 0.016 65);
+      --amber-soft: oklch(0.935 0.042 76);
+
+      /* Semantic states */
+      --ok: oklch(0.480 0.115 152);
+      --ok-ink: oklch(0.99 0.004 152);
+      --ok-soft: oklch(0.935 0.030 152);
+      --danger: oklch(0.515 0.148 26);
+      --danger-soft: oklch(0.945 0.028 26);
+
+      /* Disabled & focus tokens */
+      --bg-disabled: oklch(0.922 0.008 82);
+      --text-disabled: oklch(0.455 0.010 80);
+      --focus-ring: oklch(0.200 0.008 80);
+
+      /* Light elevation */
+      --shadow-capsule:
+        0 0 0 1px rgb(22 18 14 / 0.08),
+        0 2px 4px rgb(22 18 14 / 0.04),
+        0 10px 24px -10px rgb(22 18 14 / 0.09);
+      --shadow-popover:
+        0 0 0 1px rgb(22 18 14 / 0.09),
+        0 6px 16px -4px rgb(22 18 14 / 0.10),
+        0 16px 32px -12px rgb(22 18 14 / 0.12);
+      --shadow-control:
+        0 0 0 1px rgb(22 18 14 / 0.11),
+        0 1px 2px rgb(22 18 14 / 0.04);
+      --shadow-control-hover:
+        0 0 0 1px rgb(22 18 14 / 0.18),
+        0 2px 5px rgb(22 18 14 / 0.06);
+
+      --img-outline: rgb(0 0 0 / 0.1);
+    }
+
+    @media only screen and (min-device-pixel-ratio: 2), only screen and (min-resolution: 192dpi) {
+      :root {
+        --hairline: 0.5px;
+      }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --stage-bg: oklch(0.115 0.008 80);
+        --stage-surface: oklch(0.172 0.009 80);
+        --stage-ink: oklch(0.950 0.007 82);
+        --stage-muted: oklch(0.750 0.009 82);
+        --stage-line: oklch(0.950 0.007 82 / 0.14);
+
+        --paper-1: oklch(0.205 0.009 80);
+        --paper-2: oklch(0.245 0.010 80);
+        --paper-3: oklch(0.285 0.010 80);
+        --paper-raised: oklch(0.258 0.010 80);
+
+        --ink-12: oklch(0.945 0.008 82);
+        --ink-11: oklch(0.785 0.010 82);
+        --ink-9: oklch(0.715 0.010 82);
+        --ink-line: oklch(0.945 0.008 82 / 0.13);
+        --ink-line-strong: oklch(0.945 0.008 82 / 0.24);
+
+        --card-bg: oklch(0.185 0.009 80);
+        --card-ink: oklch(0.945 0.008 82);
+        --card-muted: oklch(0.755 0.009 82);
+        --card-focus: oklch(0.945 0.008 82);
+
+        --amber: oklch(0.765 0.145 70);
+        --amber-ink: oklch(0.155 0.016 65);
+        --amber-soft: oklch(0.285 0.042 72);
+
+        --ok: oklch(0.735 0.095 152);
+        --ok-ink: oklch(0.150 0.016 152);
+        --ok-soft: oklch(0.265 0.036 152);
+        --danger: oklch(0.725 0.118 26);
+        --danger-soft: oklch(0.275 0.036 26);
+
+        --bg-disabled: oklch(0.235 0.009 80);
+        --text-disabled: oklch(0.680 0.009 82);
+        --focus-ring: oklch(0.940 0.008 82);
+
+        --shadow-capsule: 0 0 0 1px rgb(255 255 255 / 0.12);
+        --shadow-popover: 0 0 0 1px rgb(255 255 255 / 0.14), 0 16px 36px -8px rgb(0 0 0 / 0.55);
+        --shadow-control: 0 0 0 1px rgb(255 255 255 / 0.12);
+        --shadow-control-hover: 0 0 0 1px rgb(255 255 255 / 0.20);
+
+        --img-outline: rgb(255 255 255 / 0.1);
+      }
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      font-synthesis: none;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: var(--paper-1);
+      color: var(--ink-12);
+      font-family: var(--font-sans);
+      font-size: var(--text-base);
+      font-weight: var(--weight-normal);
+      line-height: 1.55;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    ::selection {
+      background: color-mix(in oklch, var(--amber) 34%, transparent);
+    }
+
+    button, input, textarea {
+      font: inherit;
+      color: inherit;
+    }
+
+    button {
+      border: 0;
+      background: none;
+      padding: 0;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: 2px;
+    }
+
+    .stage button:focus-visible,
+    .toast button:focus-visible {
+      outline-color: var(--stage-focus);
+    }
+
+    .floating-card button:focus-visible {
+      outline-color: var(--card-focus);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .tabular {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* =====================================================================
+       REBALANCED SPLIT: compact left rail (~27%) + centered main canvas (~73%)
+       ===================================================================== */
+    .shell {
+      display: grid;
+      grid-template-columns: clamp(290px, 27%, 356px) minmax(0, 1fr);
+      min-height: 100dvh;
+    }
+
+    /* LEFT FOCUS RAIL */
+    .stage {
+      background: var(--stage-bg);
+      color: var(--stage-ink);
+      padding: 26px 26px 26px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 28px;
+      border-inline-end: var(--hairline) solid var(--ink-line);
+    }
+
+    .stage-upper {
+      display: flex;
+      flex-direction: column;
+      gap: 36px;
+    }
+
+    .stage-brand {
+      font-size: var(--text-sm);
+      font-weight: var(--weight-medium);
+      letter-spacing: -0.01em;
+      color: var(--stage-muted);
+    }
+
+    .run-block {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .clock-row {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      align-self: center;
+      background: var(--amber);
+    }
+
+    .status-dot.idle {
+      background: var(--ok);
+    }
+
+    .status-dot.paused {
+      background: var(--stage-muted);
+    }
+
+    .stage-clock {
+      font-family: var(--font-sans);
+      font-size: clamp(40px, 3.6vw, 52px);
+      font-weight: var(--weight-normal);
+      line-height: 1;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+      color: var(--stage-ink);
+    }
+
+    .clock-unit {
+      font-size: var(--text-xs);
+      color: var(--stage-muted);
+    }
+
+    .stage-headline {
+      margin: 0;
+      font-size: clamp(24px, 2.1vw, 30px);
+      font-weight: var(--weight-normal);
+      line-height: 1.14;
+      letter-spacing: -0.03em;
+      color: var(--stage-ink);
+      text-wrap: balance;
+    }
+
+    .stage-detail {
+      margin: 0;
+      font-size: var(--text-sm);
+      color: var(--stage-muted);
+      text-wrap: pretty;
+    }
+
+    .stage-caught {
+      font-size: var(--text-xs);
+      color: var(--stage-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Floating Intercept / Restore Card */
+    .stage-lower {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .floating-card {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+      background: var(--card-bg);
+      color: var(--card-ink);
+      border-radius: 14px;
+      padding: 16px 18px;
+      box-shadow: 0 0 0 1.5px var(--amber);
+    }
+
+    .floating-card.visible {
+      display: flex;
+    }
+
+    .floating-card.restore-card {
+      box-shadow: 0 0 0 1.5px var(--ok);
+    }
+
+    .floating-title {
+      margin: 0;
+      font-size: 17px;
+      font-weight: var(--weight-medium);
+      line-height: 1.25;
+      letter-spacing: -0.02em;
+      color: var(--card-ink);
+      overflow-wrap: break-word;
+    }
+
+    .floating-sub {
+      font-size: var(--text-xs);
+      color: var(--card-muted);
+      margin-top: 3px;
+    }
+
+    .bypass-btn {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      font-size: 13px;
+      font-weight: var(--weight-medium);
+      font-variant-numeric: tabular-nums;
+      transition: transform 140ms var(--ease-out-quart), background-color 150ms ease, color 150ms ease;
+    }
+
+    .bypass-btn:disabled {
+      cursor: not-allowed;
+      background: transparent;
+      color: var(--card-muted);
+      box-shadow: 0 0 0 1px color-mix(in oklch, var(--card-ink) 14%, transparent);
+    }
+
+    .bypass-btn.unlocked {
+      background: color-mix(in oklch, var(--card-ink) 8%, transparent);
+      color: var(--card-ink);
+      box-shadow: 0 0 0 1px color-mix(in oklch, var(--card-ink) 22%, transparent);
+    }
+
+    .bypass-btn.unlocked:active {
+      transform: scale(0.96);
+    }
+
+    .ring-svg {
+      width: 18px;
+      height: 18px;
+      transform: rotate(-90deg);
+      flex-shrink: 0;
+    }
+
+    .ring-track {
+      fill: none;
+      stroke: color-mix(in oklch, var(--card-ink) 15%, transparent);
+      stroke-width: 2;
+    }
+
+    .ring-fill {
+      fill: none;
+      stroke: var(--amber);
+      stroke-width: 2;
+      stroke-linecap: round;
+    }
+
+    .stage-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-top: 12px;
+      border-top: var(--hairline) solid var(--stage-line);
+      flex-wrap: wrap;
+    }
+
+    .stage-btn {
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: 8px;
+      font-size: var(--text-sm);
+      font-weight: var(--weight-medium);
+      color: var(--stage-ink);
+      background: var(--stage-surface);
+      transition: transform 140ms var(--ease-out-quart), background-color 150ms ease;
+    }
+
+    .stage-btn:active {
+      transform: scale(0.96);
+    }
+
+    .stage-btn-ghost {
+      background: transparent;
+      color: var(--stage-muted);
+    }
+
+    /* =====================================================================
+       MAIN CENTERED PAPER WORKSPACE
+       ===================================================================== */
+    .paper-pane {
+      background: var(--paper-1);
+      padding: 24px clamp(24px, 5vw, 72px) 68px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .content-col {
+      width: 100%;
+      max-width: 680px;
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+    }
+
+    /* Floating Capsule Nav — aligned cleanly with content column */
+    .nav-header {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      position: sticky;
+      top: 18px;
+      z-index: var(--z-nav);
+    }
+
+    .nav-capsule {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px;
+      border-radius: 12px;
+      background: var(--paper-raised);
+      box-shadow: var(--shadow-capsule);
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    .tabs {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .tab-btn {
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 8px; /* 12 - 4 */
+      font-size: var(--text-sm);
+      font-weight: var(--weight-medium);
+      color: var(--ink-11);
+      white-space: nowrap;
+      transition: background-color 150ms ease, color 150ms ease;
+    }
+
+    .tab-btn.active {
+      background: var(--paper-2);
+      color: var(--ink-12);
+    }
+
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .section-head {
+      padding-bottom: 18px;
+      border-bottom: var(--hairline) dashed var(--ink-line-strong);
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: clamp(38px, 4vw, var(--text-display));
+      font-weight: var(--weight-normal);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      color: var(--ink-12);
+      text-wrap: balance;
+    }
+
+    /* Buttons — Emil scale(0.96) tactile press */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 9px;
+      font-size: var(--text-sm);
+      font-weight: var(--weight-medium);
+      white-space: nowrap;
+      background: var(--paper-raised);
+      color: var(--ink-12);
+      box-shadow: var(--shadow-control);
+      transition: transform 150ms var(--ease-out-quart), background-color 150ms ease, box-shadow 150ms ease, color 150ms ease;
+    }
+
+    .btn:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    .btn:disabled {
+      cursor: not-allowed;
+      background: var(--bg-disabled);
+      color: var(--text-disabled);
+      box-shadow: 0 0 0 1px var(--ink-line);
+    }
+
+    .btn-amber {
+      min-height: 48px;
+      padding: 0 20px;
+      border-radius: 10px;
+      background: var(--amber);
+      color: var(--amber-ink);
+      font-size: 12px;
+      font-weight: var(--weight-semibold);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      box-shadow: none;
+    }
+
+    .btn-ok {
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 8px;
+      background: var(--ok);
+      color: var(--ok-ink);
+      font-size: 12px;
+      font-weight: var(--weight-semibold);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      box-shadow: none;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--ink-11);
+      box-shadow: none;
+    }
+
+    /* Emil Contextual Icon Swap (layered cross-fade: scale 0.3 + blur 3px) */
+    .icon-swap {
+      position: relative;
+      display: inline-grid;
+      place-items: center;
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .icon-swap .icon {
+      grid-area: 1 / 1;
+      transition:
+        transform 280ms var(--ease-icon-swap),
+        opacity 280ms var(--ease-icon-swap),
+        filter 280ms var(--ease-icon-swap);
+    }
+
+    .icon-swap .icon-alt {
+      opacity: 0;
+      transform: scale(0.3);
+      filter: blur(3px);
+    }
+
+    .icon-swap[data-swapped="true"] .icon-base {
+      opacity: 0;
+      transform: scale(0.3);
+      filter: blur(3px);
+    }
+
+    .icon-swap[data-swapped="true"] .icon-alt {
+      opacity: 1;
+      transform: scale(1);
+      filter: blur(0);
+    }
+
+    .icon {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.65;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Hover gating for fine pointers only */
+    @media (hover: hover) and (pointer: fine) {
+      .btn:hover:not(:disabled) {
+        box-shadow: var(--shadow-control-hover);
+        background: color-mix(in oklch, var(--paper-raised) 95%, var(--ink-12));
+      }
+      .btn-amber:hover:not(:disabled) {
+        background: var(--amber-hover);
+        box-shadow: none;
+      }
+      .btn-ok:hover:not(:disabled) {
+        background: color-mix(in oklch, var(--ok) 88%, var(--ok-ink));
+        box-shadow: none;
+      }
+      .btn-ghost:hover:not(:disabled) {
+        background: var(--paper-2);
+        color: var(--ink-12);
+        box-shadow: none;
+      }
+      .tab-btn:hover { color: var(--ink-12); }
+      .stage-btn:hover { background: color-mix(in oklch, var(--stage-surface) 84%, var(--stage-ink)); }
+      .stage-btn-ghost:hover { background: var(--stage-surface); color: var(--stage-ink); }
+      .bypass-btn.unlocked:hover { background: color-mix(in oklch, var(--card-ink) 14%, transparent); }
+      .deck-trigger:hover { box-shadow: var(--shadow-control-hover); background: color-mix(in oklch, var(--paper-raised) 96%, var(--ink-12)); }
+      .deck-option:hover { background: var(--paper-2); }
+      .rate-btn.again:hover { background: var(--danger-soft); color: var(--danger); box-shadow: 0 0 0 1px color-mix(in oklch, var(--danger) 40%, transparent); }
+      .rate-btn.hard:hover  { background: var(--amber-soft); color: var(--ink-12); box-shadow: 0 0 0 1px color-mix(in oklch, var(--amber) 55%, transparent); }
+      .rate-btn.good:hover  { background: var(--ok-soft); color: var(--ok); box-shadow: 0 0 0 1px color-mix(in oklch, var(--ok) 40%, transparent); }
+      .rate-btn.easy:hover  { background: var(--paper-3); color: var(--ink-12); }
+      .chip-remove:hover { color: var(--danger); background: var(--danger-soft); }
+      .seg-btn:hover { color: var(--ink-12); }
+    }
+
+    /* =====================================================================
+       CUSTOM EMIL-CRAFTED DECK DROPDOWN (replaces native Safari <select>)
+       ===================================================================== */
+    .spec-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .spec-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .deck-picker {
+      position: relative;
+      z-index: var(--z-popover);
+    }
+
+    .deck-trigger {
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      width: 236px;
+      min-height: 44px;
+      padding: 0 12px 0 14px;
+      border-radius: 10px;
+      background: var(--paper-raised);
+      color: var(--ink-12);
+      font-size: var(--text-sm);
+      font-weight: var(--weight-medium);
+      box-shadow: var(--shadow-control);
+      transition: transform 150ms var(--ease-out-quart), background-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .deck-trigger:active {
+      transform: scale(0.97);
+    }
+
+    .deck-trigger-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: start;
+    }
+
+    .deck-trigger-right {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .deck-count-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      color: var(--ink-11);
+      background: var(--paper-2);
+      padding: 2px 6px;
+      border-radius: 5px;
+    }
+
+    .deck-chevron {
+      width: 15px;
+      height: 15px;
+      color: var(--ink-9);
+      transition: transform 200ms var(--ease-out-quart);
+    }
+
+    .deck-trigger[aria-expanded="true"] .deck-chevron {
+      transform: rotate(180deg);
+    }
+
+    /* Origin-aware Emil popover (patterns.md: scale 0.95 + translateY(-4px), faster exit) */
+    .deck-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      inset-inline-start: 0;
+      min-width: 280px;
+      max-width: min(380px, 88vw);
+      max-height: 310px;
+      overflow-y: auto;
+      padding: 5px;
+      border-radius: 12px;
+      background: var(--paper-raised);
+      box-shadow: var(--shadow-popover);
+      transform-origin: top left;
+      opacity: 0;
+      transform: scale(0.95) translateY(-4px);
+      visibility: hidden;
+      pointer-events: none;
+      will-change: transform, opacity;
+      transition:
+        opacity 130ms ease-in,
+        transform 130ms ease-in,
+        visibility 0ms linear 130ms;
+    }
+
+    .deck-menu[data-open="true"] {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+      visibility: visible;
+      pointer-events: auto;
+      transition:
+        opacity 180ms var(--ease-out-quart),
+        transform 180ms var(--ease-out-quart),
+        visibility 0ms linear 0ms;
+    }
+
+    .deck-menu::-webkit-scrollbar {
+      width: 8px;
+    }
+    .deck-menu::-webkit-scrollbar-thumb {
+      background: color-mix(in oklch, var(--ink-12) 20%, transparent);
+      border-radius: 4px;
+    }
+
+    .deck-option {
+      width: 100%;
+      min-height: 44px;
+      padding: 8px 10px;
+      border-radius: 7px; /* concentric: 12 - 5 */
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: var(--text-sm);
+      color: var(--ink-12);
+      text-align: start;
+      /* Instant highlight for keyboard nav per Emil patterns.md */
+    }
+
+    .deck-option[data-highlighted="true"] {
+      background: var(--paper-2);
+    }
+
+    .deck-option-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .deck-check {
+      width: 14px;
+      height: 14px;
+      color: var(--amber);
+      flex-shrink: 0;
+      opacity: 0;
+    }
+
+    .deck-option[aria-selected="true"] .deck-check {
+      opacity: 1;
+    }
+
+    .deck-option-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Segmented Due | All control (exact same 44px height as deck dropdown!) */
+    .seg-control {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px;
+      border-radius: 10px;
+      background: var(--paper-2);
+    }
+
+    .seg-btn {
+      min-height: 38px;
+      position: relative;
+      padding: 0 14px;
+      border-radius: 7px; /* 10 - 3 */
+      font-size: var(--text-sm);
+      font-weight: var(--weight-medium);
+      color: var(--ink-11);
+      transition: background-color 150ms ease, color 150ms ease;
+    }
+
+    /* Hit area >= 44px vertically via pseudo-element */
+    .seg-btn::before {
+      content: "";
+      position: absolute;
+      inset: -3px 0;
+    }
+
+    .seg-btn.active {
+      background: var(--paper-raised);
+      color: var(--ink-12);
+      box-shadow: var(--shadow-control);
+    }
+
+    .spec-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sync-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: var(--text-xs);
+      color: var(--ink-11);
+    }
+
+    .sync-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--ink-9);
+    }
+
+    .sync-dot.live {
+      background: var(--ok);
+    }
+
+    .sync-inline-btn {
+      min-width: 86px;
+    }
+
+    /* Warm Linen Flashcard Surface */
+    .linen-sheet {
+      background: var(--paper-2);
+      border-radius: 14px;
+      padding: 28px 30px;
+      min-height: 256px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 18px;
+      will-change: transform, opacity;
+    }
+
+    /* Subtle tactile card arrival after rating (triggered only on rate, never on page load) */
+    @keyframes cardSettle {
+      from {
+        opacity: 0.4;
+        transform: translateY(6px) scale(0.985);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .linen-sheet.settling {
+      animation: cardSettle 210ms var(--ease-out-quart);
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: var(--text-xs);
+      color: var(--ink-9);
+    }
+
+    .card-front {
+      font-size: var(--text-card);
+      font-weight: var(--weight-normal);
+      line-height: 1.38;
+      letter-spacing: -0.02em;
+      color: var(--ink-12);
+      max-width: 58ch;
+      text-wrap: balance;
+      overflow-wrap: break-word;
+    }
+
+    .card-rule {
+      border: 0;
+      border-top: var(--hairline) solid var(--ink-line-strong);
+      margin: 18px 0;
+    }
+
+    .card-back {
+      font-size: var(--text-base);
+      line-height: 1.6;
+      color: var(--ink-12);
+      max-width: 62ch;
+      overflow-wrap: break-word;
+    }
+
+    .img-zoom-btn {
+      display: block;
+      margin: 14px 0;
+      padding: 0;
+      border-radius: 8px;
+      cursor: zoom-in;
+      max-width: 100%;
+    }
+
+    .img-zoom-btn img {
+      max-width: 100%;
+      max-height: 320px;
+      height: auto;
+      border-radius: 8px;
+      display: block;
+      outline: 1px solid var(--img-outline);
+      outline-offset: -1px;
+      background: oklch(1 0 0);
+    }
+
+    .cloze-blank {
+      display: inline-block;
+      padding: 0 8px;
+      border-radius: 5px;
+      background: var(--amber-soft);
+      color: var(--ink-12);
+      font-weight: var(--weight-semibold);
+      font-size: 0.88em;
+    }
+
+    .cloze-reveal {
+      padding: 0 5px;
+      border-radius: 5px;
+      background: var(--ok-soft);
+      color: var(--ok);
+      font-weight: var(--weight-semibold);
+    }
+
+    .anki-extra {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: var(--hairline) solid var(--ink-line);
+      font-size: var(--text-sm);
+      color: var(--ink-11);
+    }
+
+    .skeleton-line {
+      height: 16px;
+      border-radius: 6px;
+      background: var(--paper-3);
+      margin-bottom: 10px;
+    }
+
+    .empty-block {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      padding-block: 6px;
+    }
+
+    .empty-block h2 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: var(--weight-medium);
+      letter-spacing: -0.025em;
+      color: var(--ink-12);
+    }
+
+    .empty-block p {
+      margin: 0;
+      font-size: var(--text-base);
+      color: var(--ink-11);
+      max-width: 50ch;
+      text-wrap: pretty;
+    }
+
+    .action-slot {
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+    }
+
+    .action-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      flex-wrap: wrap;
+    }
+
+    .rate-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      width: 100%;
+    }
+
+    .rate-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      min-height: 52px;
+      padding: 8px 6px;
+      border-radius: 10px;
+      background: var(--paper-raised);
+      box-shadow: var(--shadow-control);
+      transition: transform 150ms var(--ease-out-quart), background-color 150ms ease, box-shadow 150ms ease, color 150ms ease;
+    }
+
+    .rate-btn:active {
+      transform: scale(0.96);
+    }
+
+    .rate-btn strong {
+      font-size: var(--text-sm);
+      font-weight: var(--weight-medium);
+    }
+
+    .rate-btn span {
+      font-size: 11px;
+      color: var(--ink-9);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .kbd-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 12px;
+      border-top: var(--hairline) solid var(--ink-line);
+      font-size: var(--text-xs);
+      color: var(--ink-9);
+      flex-wrap: wrap;
+    }
+
+    .kbd-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .kbd-pair {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    kbd {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: var(--paper-2);
+      box-shadow: 0 0 0 1px var(--ink-line-strong);
+      color: var(--ink-11);
+    }
+
+    /* SCRATCHPAD */
+    .pad-area {
+      width: 100%;
+      min-height: 300px;
+      resize: vertical;
+      border: var(--hairline) solid var(--ink-line-strong);
+      border-radius: 12px;
+      padding: 16px 18px;
+      background: var(--paper-raised);
+      color: var(--ink-12);
+      font-size: 16px;
+      line-height: 1.6;
+      transition: border-color 150ms ease;
+    }
+
+    .pad-area:focus {
+      border-color: var(--ink-12);
+    }
+
+    .pad-area::placeholder {
+      color: var(--ink-9);
+    }
+
+    .pad-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: var(--text-xs);
+      color: var(--ink-9);
+      flex-wrap: wrap;
+    }
+
+    .mono-path {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+    }
+
+    /* =====================================================================
+       REST TAB — Precision Breathing Instrument (Braun × Daylight aesthetic)
+       ===================================================================== */
+    .rest-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .rest-toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .rest-instrument {
+      background: var(--paper-2);
+      border-radius: 16px;
+      padding: 40px 28px 34px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .breath-dial {
+      position: relative;
+      width: 248px;
+      height: 248px;
+      display: grid;
+      place-items: center;
+      user-select: none;
+    }
+
+    .breath-dial-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .dial-tick {
+      stroke: var(--ink-line-strong);
+      stroke-linecap: round;
+    }
+
+    .dial-tick.major {
+      stroke: color-mix(in oklch, var(--ink-12) 34%, transparent);
+    }
+
+    .dial-track {
+      fill: none;
+      stroke: var(--ink-line);
+      stroke-width: 1.5;
+    }
+
+    .dial-progress {
+      fill: none;
+      stroke: color-mix(in oklch, var(--amber) 58%, transparent);
+      stroke-width: 1.75;
+      stroke-linecap: round;
+      transform: rotate(-90deg);
+      transform-origin: 124px 124px;
+    }
+
+    /* Three concentric translucent rings — driven smoothly by sinusoidal rAF */
+    .breath-bloom {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
+
+    .bloom-outer {
+      width: 158px;
+      height: 158px;
+      background: color-mix(in oklch, var(--amber) 9%, transparent);
+      transform: scale(0.88);
+      opacity: 0.45;
+    }
+
+    .bloom-mid {
+      width: 128px;
+      height: 128px;
+      background: color-mix(in oklch, var(--amber) 14%, transparent);
+      transform: scale(0.90);
+      opacity: 0.58;
+    }
+
+    .bloom-core {
+      width: 96px;
+      height: 96px;
+      background: var(--paper-raised);
+      box-shadow: 0 0 0 1.25px color-mix(in oklch, var(--amber) 48%, transparent);
+      transform: scale(0.95);
+    }
+
+    .breath-readout {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .breath-phase-name {
+      font-size: 17px;
+      font-weight: var(--weight-medium);
+      letter-spacing: -0.015em;
+      color: var(--ink-12);
+    }
+
+    /* Phase timeline strip */
+    .phase-strip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .phase-step {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: var(--text-xs);
+      font-weight: var(--weight-medium);
+      color: var(--ink-9);
+      font-variant-numeric: tabular-nums;
+      transition: background-color 180ms ease, color 180ms ease;
+    }
+
+    .phase-step.active {
+      background: var(--paper-raised);
+      color: var(--ink-12);
+      box-shadow: var(--shadow-control);
+    }
+
+    .rest-footer {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 14px;
+      border-top: var(--hairline) solid var(--ink-line);
+      font-size: var(--text-xs);
+      color: var(--ink-9);
+      flex-wrap: wrap;
+    }
+
+    /* SETTINGS */
+    .spec-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .spec-group-title {
+      margin: 0 0 6px;
+      font-size: 11px;
+      font-weight: var(--weight-semibold);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-9);
+    }
+
+    .spec-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 0;
+      border-bottom: var(--hairline) solid var(--ink-line);
+    }
+
+    .spec-row.clickable {
+      cursor: pointer;
+    }
+
+    .spec-row-title {
+      font-size: var(--text-base);
+      font-weight: var(--weight-medium);
+      color: var(--ink-12);
+    }
+
+    .spec-row-desc {
+      font-size: var(--text-xs);
+      color: var(--ink-11);
+      max-width: 48ch;
+      text-wrap: pretty;
+    }
+
+    .switch {
+      appearance: none;
+      -webkit-appearance: none;
+      position: relative;
+      width: 44px;
+      height: 26px;
+      border-radius: 999px;
+      background: var(--paper-3);
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: background-color 160ms ease;
+    }
+
+    .switch::before {
+      content: "";
+      position: absolute;
+      inset: -9px 0;
+    }
+
+    .switch::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--paper-raised);
+      box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+      transition: transform 200ms var(--ease-out-quart);
+    }
+
+    .switch:checked {
+      background: var(--amber);
+    }
+
+    .switch:checked::after {
+      transform: translateX(18px);
+    }
+
+    .domain-form {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .domain-input {
+      flex: 1;
+      min-height: 44px;
+      padding: 0 12px;
+      border-radius: 9px;
+      border: var(--hairline) solid var(--ink-line-strong);
+      background: var(--paper-raised);
+      font-size: 16px;
+    }
+
+    .domain-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 36px;
+      padding: 0 8px 0 12px;
+      border-radius: 8px;
+      background: var(--paper-2);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--ink-12);
+    }
+
+    .chip-remove {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 5px;
+      color: var(--ink-9);
+      transition: color 150ms ease, background-color 150ms ease;
+    }
+
+    .chip-remove::before {
+      content: "";
+      position: absolute;
+      inset: -10px;
+    }
+
+    /* Undo Toast — Emil patterns.md enter/exit */
+    .toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: var(--z-toast);
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 6px 6px 14px;
+      border-radius: 11px;
+      background: var(--stage-bg);
+      color: var(--stage-ink);
+      box-shadow: 0 0 0 1px var(--stage-line), 0 10px 28px -8px rgb(0 0 0 / 0.35);
+      font-size: var(--text-sm);
+      opacity: 0;
+      transform: translateY(14px) scale(0.96);
+      visibility: hidden;
+      pointer-events: none;
+      will-change: transform, opacity;
+      transition:
+        opacity 150ms ease-in,
+        transform 150ms ease-in,
+        visibility 0ms linear 150ms;
+    }
+
+    .toast[data-open="true"] {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      visibility: visible;
+      pointer-events: auto;
+      transition:
+        opacity 220ms var(--ease-out-quint),
+        transform 220ms var(--ease-out-quint),
+        visibility 0ms linear 0ms;
+    }
+
+    .toast-undo {
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: 7px;
+      background: var(--amber);
+      color: var(--amber-ink);
+      font-size: var(--text-xs);
+      font-weight: var(--weight-semibold);
+      transition: transform 140ms var(--ease-out-quart);
+    }
+
+    .toast-undo:active {
+      transform: scale(0.96);
+    }
+
+    /* Modal Lightbox — Emil patterns.md paired overlay + modal scale(0.97) */
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: var(--z-modal);
+      background: rgb(14 12 10 / 0.86);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      padding: 24px;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 150ms ease-in, visibility 0ms linear 150ms;
+    }
+
+    .lightbox[data-open="true"] {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transition: opacity 210ms var(--ease-enter), visibility 0ms linear 0ms;
+    }
+
+    .lightbox-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      transform: scale(0.96);
+      opacity: 0;
+      transition: transform 150ms ease-in, opacity 150ms ease-in;
+    }
+
+    .lightbox[data-open="true"] .lightbox-inner {
+      transform: scale(1);
+      opacity: 1;
+      transition: transform 210ms var(--ease-enter), opacity 210ms var(--ease-enter);
+    }
+
+    .lightbox img {
+      max-width: 92vw;
+      max-height: 80vh;
+      border-radius: 10px;
+      background: oklch(1 0 0);
+      outline: 1px solid rgb(255 255 255 / 0.14);
+      outline-offset: -1px;
+    }
+
+    .lightbox-close {
+      min-height: 44px;
+      padding: 0 18px;
+      border-radius: 9px;
+      background: oklch(0.24 0.01 80);
+      color: oklch(0.96 0.006 82);
+      font-size: var(--text-sm);
+      font-weight: var(--weight-medium);
+      box-shadow: 0 0 0 1px rgb(255 255 255 / 0.18);
+    }
+
+    .lightbox-close:focus-visible {
+      outline-color: oklch(0.96 0.006 82);
+    }
+
+    /* Confetti burst layer (GPU transform/opacity only, inert) */
+    .spark-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: var(--z-toast);
+      overflow: hidden;
+    }
+
+    .spark {
+      position: fixed;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 960px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+      .stage {
+        border-inline-end: 0;
+        border-bottom: var(--hairline) solid var(--ink-line);
+      }
+      .stage-upper {
+        gap: 24px;
+      }
+      .nav-header {
+        justify-content: flex-start;
+        position: static;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="liveAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <div id="sparkLayer" class="spark-layer" aria-hidden="true"></div>
+
+  <div class="shell">
+    <!-- ===============================================================
+         LEFT COMPACT FOCUS RAIL
+         =============================================================== -->
+    <aside class="stage">
+      <div class="stage-upper">
+        <div class="stage-brand">Agent Focus</div>
+
+        <div class="run-block">
+          <div class="clock-row">
+            <span id="clockDot" class="status-dot idle" aria-hidden="true"></span>
+            <div id="stageClock" class="stage-clock tabular">--:--</div>
+            <span id="clockUnit" class="clock-unit hidden">elapsed</span>
+          </div>
+          <h1 id="stageHeadline" class="stage-headline">Connecting…</h1>
+          <p id="stageDetail" class="stage-detail hidden"></p>
+          <div id="stageCaught" class="stage-caught hidden"></div>
+        </div>
+      </div>
+
+      <div class="stage-lower">
+        <!-- Intercepted Site Card with 30s Emergency Bypass Gate -->
+        <section id="interceptCard" class="floating-card">
+          <div>
+            <h2 id="interceptTitle" class="floating-title">Site blocked</h2>
+            <div id="interceptSub" class="floating-sub"></div>
+          </div>
+          <button id="bypassBtn" type="button" class="bypass-btn" disabled>
+            <svg id="bypassRingSvg" class="ring-svg" viewBox="0 0 24 24" aria-hidden="true">
+              <circle class="ring-track" cx="12" cy="12" r="9" />
+              <circle id="bypassRingCircle" class="ring-fill" cx="12" cy="12" r="9" stroke-dasharray="56.55" stroke-dashoffset="0" />
+            </svg>
+            <span id="bypassBtnLabel" aria-hidden="true">Available in 30s</span>
+          </button>
+        </section>
+
+        <!-- Run Finished Restore Card -->
+        <section id="restoreCard" class="floating-card restore-card">
+          <div>
+            <h2 class="floating-title">Run finished</h2>
+            <div id="restoreSub" class="floating-sub"></div>
+          </div>
+          <div class="action-row">
+            <button id="returnNowBtn" type="button" class="btn btn-ok" style="flex:1;">Back to site</button>
+            <button id="stayBtn" type="button" class="btn hidden">Stay here</button>
+          </div>
+        </section>
+
+        <div class="stage-controls">
+          <button id="pauseBtn" type="button" class="stage-btn">Pause 10 min</button>
+          <button id="clearAgentsBtn" type="button" class="stage-btn stage-btn-ghost hidden">Reset agents</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ===============================================================
+         MAIN CENTERED PAPER WORKSPACE
+         =============================================================== -->
+    <main class="paper-pane">
+      <div class="content-col">
+        <header class="nav-header">
+          <div class="nav-capsule">
+            <nav class="tabs" id="tabBar" role="tablist" aria-label="Workspace modes">
+              <button id="tab-anki" type="button" class="tab-btn active" data-tab="anki" role="tab" aria-selected="true" aria-controls="panel-anki" tabindex="0">Anki</button>
+              <button id="tab-scratchpad" type="button" class="tab-btn" data-tab="scratchpad" role="tab" aria-selected="false" aria-controls="panel-scratchpad" tabindex="-1">Scratchpad</button>
+              <button id="tab-rest" type="button" class="tab-btn" data-tab="rest" role="tab" aria-selected="false" aria-controls="panel-rest" tabindex="-1">Rest</button>
+              <button id="tab-settings" type="button" class="tab-btn" data-tab="settings" role="tab" aria-selected="false" aria-controls="panel-settings" tabindex="-1">Settings</button>
+            </nav>
+          </div>
+        </header>
+
+        <!-- ANKI PANEL -->
+        <section id="panel-anki" class="panel active" role="tabpanel" aria-labelledby="tab-anki">
+          <div class="section-head">
+            <h2 class="section-title">Flashcards</h2>
+          </div>
+
+          <div class="spec-bar">
+            <div class="spec-left">
+              <!-- Custom Emil-crafted Deck Dropdown -->
+              <div class="deck-picker" id="deckPicker">
+                <button
+                  id="deckTrigger"
+                  type="button"
+                  class="deck-trigger"
+                  role="combobox"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="deckMenu"
+                  aria-label="Choose Anki deck"
+                >
+                  <span id="deckTriggerText" class="deck-trigger-text">All decks</span>
+                  <span class="deck-trigger-right">
+                    <span id="deckTriggerCount" class="deck-count-badge hidden">0</span>
+                    <svg class="icon deck-chevron" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
+                  </span>
+                </button>
+                <div id="deckMenu" class="deck-menu" role="listbox" aria-label="Anki decks" data-open="false"></div>
+              </div>
+
+              <div class="seg-control" role="group" aria-label="Card queue">
+                <button id="modeDueBtn" type="button" class="seg-btn active" aria-pressed="true">Due</button>
+                <button id="modeAllBtn" type="button" class="seg-btn" aria-pressed="false">All</button>
+              </div>
+            </div>
+
+            <div class="spec-right">
+              <span class="sync-status">
+                <span id="ankiSyncDot" class="sync-dot" aria-hidden="true"></span>
+                <span id="ankiSyncLabel">Connecting…</span>
+              </span>
+              <button id="syncAnkiBtn" type="button" class="btn btn-ghost sync-inline-btn">
+                <span id="syncIconSwap" class="icon-swap" data-swapped="false" aria-hidden="true">
+                  <svg class="icon icon-base" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                  <svg class="icon icon-alt" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                </span>
+                <span id="syncAnkiText">Sync</span>
+              </button>
+            </div>
+          </div>
+
+          <article id="ankiSheet" class="linen-sheet">
+            <div id="ankiSkeleton">
+              <div class="skeleton-line" style="width: 30%; height: 12px; margin-bottom: 22px;"></div>
+              <div class="skeleton-line" style="width: 84%; height: 22px;"></div>
+              <div class="skeleton-line" style="width: 58%; height: 22px;"></div>
+            </div>
+
+            <div id="ankiCardContent" class="hidden">
+              <div class="card-meta">
+                <span id="cardDeckLabel"></span>
+                <span id="cardIndexLabel" class="tabular"></span>
+              </div>
+              <div id="cardFront" class="card-front"></div>
+              <hr id="cardDivider" class="card-rule hidden" />
+              <div id="cardBack" class="card-back hidden"></div>
+            </div>
+
+            <div id="ankiEmptyState" class="empty-block hidden">
+              <h2 id="ankiEmptyTitle">Nothing due</h2>
+              <p id="ankiEmptyDesc">Sync to pull phone reviews, or study all cards.</p>
+            </div>
+          </article>
+
+          <div class="action-slot">
+            <div id="ankiSkeletonAction" class="skeleton-line" style="width: 100%; height: 48px; margin: 0;"></div>
+
+            <div id="showAnswerWrap" class="action-row hidden">
+              <button id="showAnswerBtn" type="button" class="btn btn-amber" style="flex:1;">Show answer</button>
+              <button id="skipCardBtn" type="button" class="btn" style="min-height:48px;">Skip</button>
+            </div>
+
+            <div id="rateWrap" class="rate-grid hidden">
+              <button type="button" class="rate-btn again" data-ease="again"><strong>Again</strong><span id="lbl-again">1</span></button>
+              <button type="button" class="rate-btn hard" data-ease="hard"><strong>Hard</strong><span id="lbl-hard">2</span></button>
+              <button type="button" class="rate-btn good" data-ease="good"><strong>Good</strong><span id="lbl-good">3</span></button>
+              <button type="button" class="rate-btn easy" data-ease="easy"><strong>Easy</strong><span id="lbl-easy">4</span></button>
+            </div>
+
+            <div id="ankiEmptyActions" class="action-row hidden">
+              <button id="emptyPrimaryBtn" type="button" class="btn btn-amber" style="flex:1;">Sync</button>
+              <button id="emptySecondaryBtn" type="button" class="btn hidden" style="min-height:48px;">Study all cards</button>
+            </div>
+          </div>
+
+          <div class="kbd-footer">
+            <div id="kbdHints" class="kbd-group hidden">
+              <span id="hintFlip" class="kbd-pair"><kbd>Space</kbd><span>show answer</span></span>
+              <span id="hintRate" class="kbd-pair hidden"><kbd>1</kbd><span>to</span><kbd>4</kbd><span>rate</span></span>
+              <span id="hintSkip" class="kbd-pair"><kbd>S</kbd><span>skip</span></span>
+            </div>
+            <span id="ankiReviewedMeta" class="tabular"></span>
+          </div>
+        </section>
+
+        <!-- SCRATCHPAD PANEL -->
+        <section id="panel-scratchpad" class="panel" role="tabpanel" aria-labelledby="tab-scratchpad">
+          <div class="section-head">
+            <h2 class="section-title">Notes</h2>
+          </div>
+
+          <label for="padArea" class="sr-only">Scratchpad note</label>
+          <textarea id="padArea" class="pad-area" placeholder="Next prompt, open question, bug you spotted…"></textarea>
+
+          <div class="action-row">
+            <button id="obsidianPadBtn" type="button" class="btn btn-amber" style="flex:1;">Append to Obsidian</button>
+            <button id="copyPadBtn" type="button" class="btn" style="min-height:48px;">
+              <span id="copyIconSwap" class="icon-swap" data-swapped="false" aria-hidden="true">
+                <svg class="icon icon-base" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <svg class="icon icon-alt" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              </span>
+              <span id="copyPadText">Copy</span>
+            </button>
+            <button id="clearPadBtn" type="button" class="btn btn-ghost" style="min-height:48px;">Clear</button>
+          </div>
+
+          <div class="pad-meta">
+            <span id="padStatus">Saved</span>
+            <span id="obsidianMetaPath" class="mono-path"></span>
+          </div>
+        </section>
+
+        <!-- REST PANEL — Slow Coherent Breathing Dial -->
+        <section id="panel-rest" class="panel" role="tabpanel" aria-labelledby="tab-rest">
+          <div class="section-head">
+            <h2 class="section-title">Rest</h2>
+          </div>
+
+          <div class="rest-toolbar">
+            <div class="seg-control" role="group" aria-label="Breathing cadence">
+              <button type="button" class="seg-btn active" data-cadence="slow" aria-pressed="true">Slow 5–5</button>
+              <button type="button" class="seg-btn" data-cadence="calm" aria-pressed="false">Calm 4–4–6</button>
+              <button type="button" class="seg-btn" data-cadence="box" aria-pressed="false">Box 4–4–4–4</button>
+            </div>
+
+            <div class="rest-toolbar-actions">
+              <button id="breathAudioBtn" type="button" class="btn btn-ghost" aria-pressed="false" aria-label="Toggle breath chime">
+                <span id="breathAudioSwap" class="icon-swap" data-swapped="false" aria-hidden="true">
+                  <svg class="icon icon-base" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>
+                  <svg class="icon icon-alt" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                </span>
+                <span>Chime</span>
+              </button>
+              <button id="breathToggleBtn" type="button" class="btn" aria-pressed="true">Pause</button>
+            </div>
+          </div>
+
+          <div class="rest-instrument">
+            <div class="breath-dial">
+              <svg id="breathDialSvg" class="breath-dial-svg" viewBox="0 0 248 248" aria-hidden="true">
+                <g id="dialTicks"></g>
+                <circle class="dial-track" cx="124" cy="124" r="102" />
+                <circle id="dialProgress" class="dial-progress" cx="124" cy="124" r="102" stroke-dasharray="640.88" stroke-dashoffset="640.88" />
+              </svg>
+
+              <div id="bloomOuter" class="breath-bloom bloom-outer" aria-hidden="true"></div>
+              <div id="bloomMid" class="breath-bloom bloom-mid" aria-hidden="true"></div>
+              <div id="bloomCore" class="breath-bloom bloom-core" aria-hidden="true"></div>
+
+              <div class="breath-readout">
+                <span id="breathPhaseName" class="breath-phase-name">Inhale</span>
+              </div>
+            </div>
+
+            <div id="phaseStrip" class="phase-strip" aria-hidden="true"></div>
+
+            <div class="rest-footer">
+              <span>Look at something across the room.</span>
+              <span id="breathCycles" class="tabular">0 cycles</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- SETTINGS PANEL -->
+        <section id="panel-settings" class="panel" role="tabpanel" aria-labelledby="tab-settings">
+          <div class="section-head">
+            <h2 class="section-title">Settings</h2>
+          </div>
+
+          <div class="spec-group">
+            <h3 class="spec-group-title">Behavior</h3>
+            <label class="spec-row clickable" for="toggleAutoRestore">
+              <div>
+                <div class="spec-row-title">Reopen blocked site when done</div>
+                <div class="spec-row-desc">After the last run ends. Skipped while you’re studying or typing.</div>
+              </div>
+              <input type="checkbox" id="toggleAutoRestore" class="switch" />
+            </label>
+            <label class="spec-row clickable" for="toggleChime">
+              <div>
+                <div class="spec-row-title">Tactile sounds &amp; completion bell</div>
+                <div class="spec-row-desc">Warm chimes for card ratings, milestones, and finished runs.</div>
+              </div>
+              <input type="checkbox" id="toggleChime" class="switch" />
+            </label>
+            <label class="spec-row clickable" for="toggleManualFocus">
+              <div>
+                <div class="spec-row-title">Always block</div>
+                <div class="spec-row-desc">Block sites even with no agent running.</div>
+              </div>
+              <input type="checkbox" id="toggleManualFocus" class="switch" />
+            </label>
+          </div>
+
+          <div class="spec-group">
+            <h3 class="spec-group-title">Active agents</h3>
+            <div id="activeAgentsList"></div>
+          </div>
+
+          <div id="bypassesBox" class="spec-group hidden">
+            <h3 class="spec-group-title">Open for now</h3>
+            <div id="bypassesList" class="domain-chips"></div>
+          </div>
+
+          <div class="spec-group">
+            <h3 class="spec-group-title">Blocked sites</h3>
+            <form id="addDomainForm" class="domain-form">
+              <label for="addDomainInput" class="sr-only">Site to block</label>
+              <input id="addDomainInput" class="domain-input" placeholder="spiegel.de or mail.proton.me" autocomplete="off" spellcheck="false" />
+              <button type="submit" class="btn">Add</button>
+            </form>
+            <div id="domainsList" class="domain-chips"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Undo Toast -->
+  <div id="undoToast" class="toast" role="status" aria-live="polite" data-open="false">
+    <span id="undoText">Cleared</span>
+    <button id="undoActionBtn" type="button" class="toast-undo">Undo</button>
+  </div>
+
+  <!-- Modal Image Lightbox -->
+  <div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-label="Enlarged flashcard image" data-open="false">
+    <div class="lightbox-inner">
+      <img id="lightboxImg" src="" alt="" />
+      <button id="lightboxClose" type="button" class="lightbox-close">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get("from") || "";
+    const fromDomain = params.get("domain") || "";
+    const interceptedAtParam = Number(params.get("t") || 0);
+
+    let state = null;
+    let wasBlocking = Boolean(fromUrl);
+    let userEngaged = false;
+    let restoreCountdownTimer = null;
+    let restoreSecondsLeft = 0;
+
+    let bypassCooldownTotal = 30;
+    let bypassUnlockedAnnounced = false;
+    let interceptStartSec = interceptedAtParam || Math.floor(Date.now() / 1000);
+    const BYPASS_CIRC = 2 * Math.PI * 9;
+
+    // Anki state
+    let ankiCards = [];
+    let ankiIndex = 0;
+    let ankiRevealed = false;
+    let ankiDeck = localStorage.getItem("agentFocusDeck") || "ALL";
+    let ankiStudyMode = localStorage.getItem("agentFocusStudyMode") || "due";
+    let ankiData = null;
+    let ankiLoadError = false;
+    let sessionStreak = 0;
+
+    // Custom Dropdown state
+    let deckOptions = [];
+    let deckMenuOpen = false;
+    let deckHighlightIdx = 0;
+
+    // Modal focus return
+    let lightboxTriggerEl = null;
+
+    // Undo toast
+    let undoTimer = null;
+    let undoHandler = null;
+
+    const $ = (id) => document.getElementById(id);
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    function announce(msg) {
+      const el = $("liveAnnouncer");
+      el.textContent = "";
+      requestAnimationFrame(() => { el.textContent = msg; });
+    }
+
+    // =========================================================================
+    // DOPAMINE TACTILE SOUND ENGINE (Zero-dependency Web Audio synth)
+    // =========================================================================
+    const SFX = (() => {
+      let ctx = null;
+      function getCtx() {
+        if (!state?.config?.completion_chime && state !== null) return null;
+        try {
+          if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+          if (ctx.state === "suspended") ctx.resume();
+          return ctx;
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function tone(c, freq, startOffset, duration, vol, type = "triangle", overtone = 0) {
+        const t = c.currentTime + startOffset;
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(vol, t + 0.009);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+        osc.connect(gain);
+        gain.connect(c.destination);
+        osc.start(t);
+        osc.stop(t + duration + 0.02);
+
+        if (overtone > 0) {
+          const osc2 = c.createOscillator();
+          const gain2 = c.createGain();
+          osc2.type = "sine";
+          osc2.frequency.setValueAtTime(freq * 2, t);
+          gain2.gain.setValueAtTime(0.0001, t);
+          gain2.gain.exponentialRampToValueAtTime(vol * overtone, t + 0.006);
+          gain2.gain.exponentialRampToValueAtTime(0.0001, t + duration * 0.55);
+          osc2.connect(gain2);
+          gain2.connect(c.destination);
+          osc2.start(t);
+          osc2.stop(t + duration * 0.6);
+        }
+      }
+
+      return {
+        tick() {
+          const c = getCtx();
+          if (!c) return;
+          tone(c, 920, 0, 0.022, 0.028, "sine");
+        },
+        flip() {
+          const c = getCtx();
+          if (!c) return;
+          // Crisp cotton-card woody flip
+          tone(c, 310, 0, 0.045, 0.055, "triangle");
+          tone(c, 640, 0.012, 0.032, 0.025, "sine");
+        },
+        rateAgain() {
+          const c = getCtx();
+          if (!c) return;
+          tone(c, 330, 0, 0.09, 0.05, "triangle");
+          tone(c, 277.18, 0.075, 0.14, 0.045, "triangle");
+        },
+        rateHard() {
+          const c = getCtx();
+          if (!c) return;
+          tone(c, 392.0, 0, 0.14, 0.055, "triangle", 0.25);
+        },
+        rateGood() {
+          const c = getCtx();
+          if (!c) return;
+          // Warm ascending marimba fifth (C5 -> G5)
+          tone(c, 523.25, 0, 0.18, 0.065, "triangle", 0.35);
+          tone(c, 783.99, 0.065, 0.26, 0.072, "triangle", 0.35);
+        },
+        rateEasy() {
+          const c = getCtx();
+          if (!c) return;
+          // Sparkling major triad arpeggio (C5 -> E5 -> G5 -> C6)
+          tone(c, 523.25, 0, 0.16, 0.055, "triangle", 0.4);
+          tone(c, 659.25, 0.05, 0.18, 0.06, "triangle", 0.4);
+          tone(c, 783.99, 0.10, 0.22, 0.065, "triangle", 0.4);
+          tone(c, 1046.5, 0.15, 0.34, 0.06, "sine", 0.25);
+        },
+        celebrate() {
+          const c = getCtx();
+          if (!c) return;
+          // Lush major-9th streak / deck cleared chord
+          [523.25, 659.25, 783.99, 987.77, 1174.66].forEach((f, i) => {
+            tone(c, f, i * 0.055, 0.45, 0.055, "triangle", 0.3);
+          });
+        },
+        confirm() {
+          const c = getCtx();
+          if (!c) return;
+          tone(c, 659.25, 0, 0.12, 0.045, "sine", 0.2);
+          tone(c, 880.0, 0.055, 0.20, 0.05, "sine", 0.2);
+        },
+        agentDone() {
+          const c = getCtx();
+          if (!c) return;
+          tone(c, 587.33, 0, 0.42, 0.06, "sine", 0.25);
+          tone(c, 880.0, 0.13, 0.62, 0.065, "sine", 0.2);
+        },
+        breath(phaseName) {
+          if (!breathAudioOn) return;
+          const c = getCtx();
+          if (!c) return;
+          if (phaseName === "Inhale") tone(c, 349.23, 0, 0.9, 0.032, "sine", 0.15);
+          else if (phaseName === "Exhale") tone(c, 261.63, 0, 1.1, 0.03, "sine", 0.12);
+        },
+      };
+    })();
+
+    // =========================================================================
+    // JOYFUL TACTILE PARTICLE BURST (GPU transform + opacity via WAAPI)
+    // =========================================================================
+    function emitSparks(originEl, palette, count = 12) {
+      if (prefersReducedMotion.matches || !originEl) return;
+      const rect = originEl.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const layer = $("sparkLayer");
+
+      for (let i = 0; i < count; i++) {
+        const dot = document.createElement("span");
+        dot.className = "spark";
+        const size = 4 + Math.random() * 4;
+        dot.style.width = `${size}px`;
+        dot.style.height = `${size}px`;
+        dot.style.left = `${cx - size / 2}px`;
+        dot.style.top = `${cy - size / 2}px`;
+        dot.style.background = palette[i % palette.length];
+        layer.appendChild(dot);
+
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.45;
+        const dist = 34 + Math.random() * 46;
+        const dx = Math.cos(angle) * dist;
+        const dy = Math.sin(angle) * dist - 14;
+
+        const anim = dot.animate(
+          [
+            { transform: "translate(0, 0) scale(1)", opacity: 1 },
+            { transform: `translate(${dx}px, ${dy}px) scale(0.35)`, opacity: 0 },
+          ],
+          { duration: 420 + Math.random() * 140, easing: "cubic-bezier(0.165, 0.84, 0.44, 1)", fill: "forwards" }
+        );
+        anim.onfinish = () => dot.remove();
+      }
+    }
+
+    // --- Undo Toast ---
+    function showUndo(message, onUndo) {
+      if (undoTimer) clearTimeout(undoTimer);
+      undoHandler = onUndo;
+      $("undoText").textContent = message;
+      $("undoToast").setAttribute("data-open", "true");
+      undoTimer = setTimeout(() => {
+        $("undoToast").setAttribute("data-open", "false");
+        undoHandler = null;
+      }, 5000);
+    }
+
+    $("undoActionBtn").addEventListener("click", () => {
+      SFX.tick();
+      if (undoTimer) clearTimeout(undoTimer);
+      $("undoToast").setAttribute("data-open", "false");
+      if (undoHandler) {
+        const fn = undoHandler;
+        undoHandler = null;
+        fn();
+      }
+    });
+
+    // --- Accessible Tablist ---
+    const tabButtons = [...document.querySelectorAll('[role="tab"]')];
+
+    function setActiveTab(name, moveFocus = false, playSound = false) {
+      if (playSound) SFX.tick();
+      tabButtons.forEach((b) => {
+        const active = b.dataset.tab === name;
+        b.classList.toggle("active", active);
+        b.setAttribute("aria-selected", String(active));
+        b.tabIndex = active ? 0 : -1;
+        if (active && moveFocus) b.focus();
+      });
+      document.querySelectorAll('[role="tabpanel"]').forEach((p) => {
+        p.classList.toggle("active", p.id === `panel-${name}`);
+      });
+      localStorage.setItem("agentFocusTab", name);
+      if (name === "rest") startRestLoop();
+      else pauseRestLoop(false);
+    }
+
+    tabButtons.forEach((btn, idx) => {
+      btn.addEventListener("click", () => setActiveTab(btn.dataset.tab, false, true));
+      btn.addEventListener("keydown", (e) => {
+        let targetIdx = null;
+        if (e.key === "ArrowRight") targetIdx = (idx + 1) % tabButtons.length;
+        else if (e.key === "ArrowLeft") targetIdx = (idx - 1 + tabButtons.length) % tabButtons.length;
+        else if (e.key === "Home") targetIdx = 0;
+        else if (e.key === "End") targetIdx = tabButtons.length - 1;
+        if (targetIdx !== null) {
+          e.preventDefault();
+          setActiveTab(tabButtons[targetIdx].dataset.tab, true, false);
+        }
+      });
+    });
+
+    // --- 30-Second Bypass Gate ---
+    function bypassMinutesLabel() {
+      const secs = state?.config?.default_bypass_seconds || 120;
+      return `${Math.max(1, Math.round(secs / 60))} min`;
+    }
+
+    function updateInterceptCopy() {
+      if (!fromDomain) return;
+      $("interceptTitle").textContent = `${fromDomain} is blocked`;
+      const autoOn = state ? Boolean(state.config.auto_restore) : true;
+      $("interceptSub").textContent = autoOn ? "Reopens when all runs finish" : "Agent still running";
+    }
+
+    function updateBypassGate() {
+      if (!fromDomain || !fromUrl) return;
+      const btn = $("bypassBtn");
+      const label = $("bypassBtnLabel");
+      const ringSvg = $("bypassRingSvg");
+      const circle = $("bypassRingCircle");
+
+      const total = state?.config?.bypass_cooldown_seconds ?? bypassCooldownTotal;
+      const elapsedLocal = Date.now() / 1000 - interceptStartSec;
+      const remaining = Math.max(0, Math.ceil(total - elapsedLocal));
+
+      if (remaining > 0) {
+        btn.disabled = true;
+        btn.classList.remove("unlocked");
+        btn.setAttribute("aria-label", `Temporary bypass locked for ${total} seconds`);
+        ringSvg.classList.remove("hidden");
+        const frac = Math.min(1, Math.max(0, remaining / Math.max(1, total)));
+        circle.style.strokeDashoffset = String(BYPASS_CIRC * (1 - frac));
+        label.textContent = `Available in ${remaining}s`;
+      } else {
+        const text = `Open for ${bypassMinutesLabel()}`;
+        btn.disabled = false;
+        btn.classList.add("unlocked");
+        btn.setAttribute("aria-label", `${text} for ${fromDomain}`);
+        ringSvg.classList.add("hidden");
+        label.textContent = text;
+        if (!bypassUnlockedAnnounced) {
+          bypassUnlockedAnnounced = true;
+          announce(`Temporary bypass is now available for ${fromDomain}.`);
+        }
+      }
+    }
+
+    if (fromDomain && fromUrl) {
+      updateInterceptCopy();
+      $("interceptCard").classList.add("visible");
+      $("returnNowBtn").textContent = `Back to ${fromDomain}`;
+      updateBypassGate();
+    }
+
+    $("bypassBtn").addEventListener("click", async () => {
+      if (!fromDomain || $("bypassBtn").disabled) return;
+      SFX.tick();
+      const secs = state?.config?.default_bypass_seconds || 120;
+      const res = await fetch("/api/bypass", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: fromDomain, seconds: secs }),
+      });
+      if (res.ok) {
+        window.location.href = fromUrl;
+      } else {
+        const data = await res.json().catch(() => ({}));
+        if (typeof data.remaining === "number" && data.remaining > 0) {
+          interceptStartSec = Date.now() / 1000 - ((state?.config?.bypass_cooldown_seconds || 30) - data.remaining);
+          updateBypassGate();
+        }
+      }
+    });
+
+    $("returnNowBtn").addEventListener("click", () => {
+      cancelRestoreCountdown();
+      if (fromUrl) window.location.href = fromUrl;
+    });
+
+    $("stayBtn").addEventListener("click", () => {
+      SFX.tick();
+      cancelRestoreCountdown();
+      $("stayBtn").classList.add("hidden");
+      $("restoreSub").textContent = "";
+    });
+
+    function cancelRestoreCountdown() {
+      if (restoreCountdownTimer) {
+        clearInterval(restoreCountdownTimer);
+        restoreCountdownTimer = null;
+      }
+    }
+
+    function triggerCompletionRestore() {
+      SFX.agentDone();
+      announce("Agent run finished.");
+      if (!fromUrl) return;
+      $("restoreCard").classList.add("visible");
+      $("interceptCard").classList.remove("visible");
+
+      const shouldAuto = Boolean(state?.config?.auto_restore);
+      if (shouldAuto && !userEngaged) {
+        restoreSecondsLeft = 3;
+        $("stayBtn").classList.remove("hidden");
+        $("restoreSub").textContent = `Back to ${fromDomain || "site"} in ${restoreSecondsLeft}s`;
+        cancelRestoreCountdown();
+        restoreCountdownTimer = setInterval(() => {
+          restoreSecondsLeft -= 1;
+          if (restoreSecondsLeft <= 0) {
+            cancelRestoreCountdown();
+            window.location.href = fromUrl;
+          } else {
+            $("restoreSub").textContent = `Back to ${fromDomain || "site"} in ${restoreSecondsLeft}s`;
+          }
+        }, 1000);
+      } else {
+        $("stayBtn").classList.add("hidden");
+        $("restoreSub").textContent = "";
+      }
+    }
+
+    $("pauseBtn").addEventListener("click", async () => {
+      SFX.tick();
+      const isPaused = (state?.paused_remaining || 0) > 0;
+      await fetch("/api/pause", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seconds: isPaused ? 0 : 600 }),
+      });
+    });
+
+    $("clearAgentsBtn").addEventListener("click", async () => {
+      SFX.tick();
+      const prevAgents = state?.agents ? [...state.agents] : [];
+      await fetch("/api/agent/clear", { method: "POST" });
+      if (prevAgents.length) {
+        showUndo("Active runs cleared", async () => {
+          for (const a of prevAgents) {
+            await fetch("/api/agent/start", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ session_id: a.session_id, agent: a.agent, pid: a.pid || 0, cwd: a.cwd || "" }),
+            });
+          }
+        });
+      }
+    });
+
+    function formatElapsed(sec) {
+      const s = Math.max(0, Math.floor(sec));
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+    }
+
+    function prettyAgent(name) {
+      return ({ claude: "Claude Code", codex: "Codex", antigravity: "Antigravity" })[name] || name;
+    }
+
+    function updateClockVisual() {
+      const clock = $("stageClock");
+      const unit = $("clockUnit");
+      if (!state) return;
+
+      if (state.paused_remaining > 0) {
+        clock.textContent = formatElapsed(state.paused_remaining);
+        unit.textContent = "left";
+        unit.classList.remove("hidden");
+      } else if (state.blocking) {
+        if (state.earliest_start) {
+          clock.textContent = formatElapsed(Math.max(0, Date.now() / 1000 - state.earliest_start));
+          unit.textContent = "elapsed";
+          unit.classList.remove("hidden");
+        } else {
+          clock.textContent = "--:--";
+          unit.classList.add("hidden");
+        }
+      } else {
+        clock.textContent = "00:00";
+        unit.classList.add("hidden");
+      }
+    }
+
+    function renderState(next) {
+      const prevBlocking = state ? state.blocking : wasBlocking;
+      state = next;
+      bypassCooldownTotal = state.config.bypass_cooldown_seconds ?? 30;
+
+      const dot = $("clockDot");
+      const headline = $("stageHeadline");
+      const detail = $("stageDetail");
+
+      dot.classList.remove("idle", "paused");
+
+      if (state.paused_remaining > 0) {
+        dot.classList.add("paused");
+        const mins = Math.ceil(state.paused_remaining / 60);
+        headline.textContent = "Paused";
+        detail.textContent = `Blocked sites open normally for ${mins} min.`;
+        detail.classList.remove("hidden");
+        $("pauseBtn").textContent = "Resume";
+      } else if (state.blocking) {
+        $("pauseBtn").textContent = "Pause 10 min";
+        if (state.active_count === 1) {
+          const a = state.agents[0];
+          headline.textContent = `${prettyAgent(a.agent)} is working`;
+          if (a.project) {
+            detail.textContent = `In ${a.project}.`;
+            detail.classList.remove("hidden");
+          } else {
+            detail.classList.add("hidden");
+          }
+        } else if (state.active_count > 1) {
+          const counts = {};
+          state.agents.forEach((a) => {
+            const name = prettyAgent(a.agent);
+            counts[name] = (counts[name] || 0) + 1;
+          });
+          const entries = Object.entries(counts);
+          if (entries.length === 1) {
+            const [name, cnt] = entries[0];
+            headline.textContent = `${cnt} ${name} runs`;
+            const projects = [...new Set(state.agents.map((a) => a.project).filter(Boolean))];
+            if (projects.length) {
+              detail.textContent = projects.join(", ");
+              detail.classList.remove("hidden");
+            } else {
+              detail.classList.add("hidden");
+            }
+          } else {
+            headline.textContent = `${state.active_count} agents working`;
+            detail.textContent = entries.map(([n, c]) => (c > 1 ? `${c} ${n}` : n)).join(", ");
+            detail.classList.remove("hidden");
+          }
+        } else {
+          headline.textContent = "Always-block is on";
+          detail.textContent = "Blocked sites redirect here until you turn it off.";
+          detail.classList.remove("hidden");
+        }
+        cancelRestoreCountdown();
+        $("restoreCard").classList.remove("visible");
+        if (fromDomain && fromUrl) {
+          updateInterceptCopy();
+          $("interceptCard").classList.add("visible");
+          updateBypassGate();
+        }
+      } else {
+        dot.classList.add("idle");
+        $("pauseBtn").textContent = "Pause 10 min";
+        headline.textContent = "Your turn";
+        detail.textContent = "Sites are open. Blocking starts with your next prompt.";
+        detail.classList.remove("hidden");
+        if (prevBlocking && !state.blocking) {
+          triggerCompletionRestore();
+        }
+      }
+
+      updateClockVisual();
+      wasBlocking = state.blocking;
+      $("clearAgentsBtn").classList.toggle("hidden", state.active_count === 0);
+
+      const caught = state.intercept_count_today || 0;
+      if (caught > 0) {
+        $("stageCaught").textContent = `${caught} blocked today`;
+        $("stageCaught").classList.remove("hidden");
+      } else {
+        $("stageCaught").classList.add("hidden");
+      }
+
+      $("toggleAutoRestore").checked = Boolean(state.config.auto_restore);
+      $("toggleChime").checked = Boolean(state.config.completion_chime);
+      $("toggleManualFocus").checked = Boolean(state.manual_focus);
+
+      const obsConfigured = Boolean(state.config.obsidian_configured);
+      $("obsidianPadBtn").classList.toggle("hidden", !obsConfigured);
+      $("obsidianMetaPath").textContent = obsConfigured
+        ? `${state.config.obsidian_label} · ⌘↩ to append`
+        : "Saved locally";
+
+      const agentsEl = $("activeAgentsList");
+      if (!state.agents.length) {
+        agentsEl.innerHTML = '<div class="spec-row"><span class="spec-row-desc">None running</span></div>';
+      } else {
+        agentsEl.innerHTML = state.agents.map((a) => {
+          const elapsed = formatElapsed(Date.now() / 1000 - a.started_at);
+          const proj = a.project ? ` in ${escapeHtml(a.project)}` : "";
+          return `<div class="spec-row"><span class="spec-row-title">${escapeHtml(prettyAgent(a.agent))}${proj}</span><span class="tabular mono-path" style="color:var(--ink-11)">${elapsed}</span></div>`;
+        }).join("");
+      }
+
+      const bypassEntries = Object.entries(state.bypasses || {});
+      $("bypassesBox").classList.toggle("hidden", bypassEntries.length === 0);
+      $("bypassesList").innerHTML = bypassEntries.map(([dom, secs]) => (
+        `<span class="chip">${escapeHtml(dom)} (${secs}s)<button type="button" class="chip-remove" data-revoke="${escapeHtml(dom)}" aria-label="Revoke ${escapeHtml(dom)} bypass">&times;</button></span>`
+      )).join("");
+      $("bypassesList").querySelectorAll("button[data-revoke]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          SFX.tick();
+          fetch("/api/bypass", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ domain: btn.dataset.revoke, remove: true }),
+          });
+        });
+      });
+
+      const domEl = $("domainsList");
+      domEl.innerHTML = (state.config.blocked_domains || []).map((d) => (
+        `<span class="chip">${escapeHtml(d)}<button type="button" class="chip-remove" data-remove="${escapeHtml(d)}" aria-label="Remove ${escapeHtml(d)}">&times;</button></span>`
+      )).join("");
+      domEl.querySelectorAll("button[data-remove]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          SFX.tick();
+          fetch("/api/config", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ remove_domain: btn.dataset.remove }),
+          });
+        });
+      });
+    }
+
+    setInterval(() => {
+      updateClockVisual();
+      if (fromDomain && fromUrl) updateBypassGate();
+    }, 1000);
+
+    function connectEvents() {
+      const es = new EventSource("/api/events");
+      es.addEventListener("state", (ev) => {
+        try { renderState(JSON.parse(ev.data)); } catch (_) {}
+      });
+      es.onerror = () => {
+        es.close();
+        setTimeout(connectEvents, 2000);
+      };
+    }
+    connectEvents();
+
+    // Settings handlers
+    $("toggleAutoRestore").addEventListener("change", (e) => {
+      SFX.tick();
+      fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auto_restore: e.target.checked }) });
+    });
+    $("toggleChime").addEventListener("change", (e) => {
+      fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ completion_chime: e.target.checked }) });
+      if (e.target.checked) setTimeout(() => SFX.confirm(), 60);
+    });
+    $("toggleManualFocus").addEventListener("change", (e) => {
+      SFX.tick();
+      fetch("/api/focus", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: e.target.checked }) });
+    });
+    $("addDomainForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const val = $("addDomainInput").value.trim();
+      if (!val) return;
+      SFX.confirm();
+      $("addDomainInput").value = "";
+      await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ add_domain: val }) });
+    });
+
+    // =========================================================================
+    // CUSTOM ACCESSIBLE DECK DROPDOWN
+    // =========================================================================
+    function renderDeckDropdown() {
+      const menu = $("deckMenu");
+      const current = deckOptions.find((o) => o.value === ankiDeck) || deckOptions[0];
+      if (current) {
+        $("deckTriggerText").textContent = current.label;
+        $("deckTriggerCount").textContent = String(current.count);
+        $("deckTriggerCount").classList.remove("hidden");
+      }
+
+      menu.innerHTML = deckOptions.map((opt, idx) => {
+        const selected = opt.value === ankiDeck;
+        return `
+          <button
+            type="button"
+            class="deck-option"
+            role="option"
+            data-idx="${idx}"
+            data-value="${escapeHtml(opt.value)}"
+            aria-selected="${selected}"
+            data-highlighted="${idx === deckHighlightIdx}"
+          >
+            <span class="deck-option-left">
+              <svg class="icon deck-check" viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+              <span class="deck-option-label">${escapeHtml(opt.label)}</span>
+            </span>
+            <span class="deck-count-badge">${opt.count}</span>
+          </button>`;
+      }).join("");
+
+      menu.querySelectorAll(".deck-option").forEach((btn) => {
+        btn.addEventListener("click", () => selectDeck(btn.dataset.value));
+      });
+    }
+
+    function setDeckMenuOpen(open, restoreFocus = false) {
+      deckMenuOpen = open;
+      $("deckTrigger").setAttribute("aria-expanded", String(open));
+      $("deckMenu").setAttribute("data-open", String(open));
+      if (open) {
+        deckHighlightIdx = Math.max(0, deckOptions.findIndex((o) => o.value === ankiDeck));
+        updateDeckHighlight();
+      } else if (restoreFocus) {
+        $("deckTrigger").focus();
+      }
+    }
+
+    function updateDeckHighlight() {
+      $("deckMenu").querySelectorAll(".deck-option").forEach((el, idx) => {
+        const hl = idx === deckHighlightIdx;
+        el.setAttribute("data-highlighted", String(hl));
+        if (hl) el.scrollIntoView({ block: "nearest" });
+      });
+    }
+
+    function selectDeck(value) {
+      SFX.tick();
+      ankiDeck = value;
+      localStorage.setItem("agentFocusDeck", ankiDeck);
+      setDeckMenuOpen(false, true);
+      loadAnki();
+    }
+
+    $("deckTrigger").addEventListener("click", () => {
+      SFX.tick();
+      setDeckMenuOpen(!deckMenuOpen);
+    });
+
+    $("deckTrigger").addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (!deckMenuOpen) setDeckMenuOpen(true);
+        else {
+          deckHighlightIdx = (deckHighlightIdx + 1) % Math.max(1, deckOptions.length);
+          updateDeckHighlight();
+        }
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (!deckMenuOpen) setDeckMenuOpen(true);
+        else {
+          deckHighlightIdx = (deckHighlightIdx - 1 + deckOptions.length) % Math.max(1, deckOptions.length);
+          updateDeckHighlight();
+        }
+      } else if (e.key === "Enter" || e.key === " ") {
+        if (deckMenuOpen) {
+          e.preventDefault();
+          const chosen = deckOptions[deckHighlightIdx];
+          if (chosen) selectDeck(chosen.value);
+        }
+      } else if (e.key === "Escape" && deckMenuOpen) {
+        e.preventDefault();
+        setDeckMenuOpen(false, true);
+      }
+    });
+
+    document.addEventListener("click", (e) => {
+      if (deckMenuOpen && !$("deckPicker").contains(e.target)) {
+        setDeckMenuOpen(false);
+      }
+    });
+
+    // --- ANKI ---
+    function renderMathIn(el) {
+      if (!el || typeof window.renderMathInElement !== "function") return;
+      try {
+        window.renderMathInElement(el, {
+          delimiters: [
+            { left: "\\(", right: "\\)", display: false },
+            { left: "\\[", right: "\\]", display: true },
+            { left: "$$", right: "$$", display: true },
+          ],
+          throwOnError: false,
+        });
+      } catch (_) {}
+    }
+
+    function updateStudyModeButtons() {
+      const isDue = ankiStudyMode !== "all";
+      $("modeDueBtn").classList.toggle("active", isDue);
+      $("modeDueBtn").setAttribute("aria-pressed", String(isDue));
+      $("modeAllBtn").classList.toggle("active", !isDue);
+      $("modeAllBtn").setAttribute("aria-pressed", String(!isDue));
+    }
+    updateStudyModeButtons();
+
+    async function loadAnki() {
+      ankiLoadError = false;
+      try {
+        const res = await fetch(`/api/anki/cards?deck=${encodeURIComponent(ankiDeck)}&mode=${encodeURIComponent(ankiStudyMode)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        ankiData = await res.json();
+        ankiCards = ankiData.cards || [];
+        ankiIndex = 0;
+        ankiRevealed = false;
+
+        const isLive = Boolean(ankiData.ankiconnect);
+        $("ankiSyncDot").classList.toggle("live", isLive);
+        $("ankiSyncLabel").textContent = isLive ? "Connected" : "Anki closed";
+
+        const allCount = ankiStudyMode === "all"
+          ? ankiData.total_cards || 0
+          : (ankiData.total_due || 0) + (ankiData.total_new || 0);
+        deckOptions = [{ value: "ALL", label: "All decks", count: allCount }];
+        (ankiData.decks || []).forEach((d) => {
+          const cnt = ankiStudyMode === "all" ? (d.count || 0) : ((d.due || 0) + (d.new || 0));
+          deckOptions.push({ value: d.name, label: d.label || d.name, count: cnt });
+        });
+        if (!deckOptions.some((o) => o.value === ankiDeck)) ankiDeck = "ALL";
+        renderDeckDropdown();
+      } catch (_) {
+        ankiLoadError = true;
+        ankiCards = [];
+        $("ankiSyncDot").classList.remove("live");
+        $("ankiSyncLabel").textContent = "Couldn’t reach server";
+      }
+
+      $("ankiSkeleton").classList.add("hidden");
+      $("ankiSkeletonAction").classList.add("hidden");
+      renderAnkiCard();
+    }
+
+    function wrapCardImages(container) {
+      container.querySelectorAll("img").forEach((img) => {
+        if (img.parentElement && img.parentElement.classList.contains("img-zoom-btn")) return;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "img-zoom-btn";
+        btn.setAttribute("aria-label", img.alt ? `Enlarge ${img.alt}` : "Enlarge card image");
+        img.parentNode.insertBefore(btn, img);
+        btn.appendChild(img);
+        btn.addEventListener("click", () => openLightbox(img.src, img.alt || "", btn));
+      });
+    }
+
+    function renderAnkiCard(animateNext = false) {
+      const rev = ankiData?.reviewed_today || 0;
+      $("ankiReviewedMeta").textContent = `${rev} reviewed today`;
+
+      if (animateNext && !prefersReducedMotion.matches) {
+        const sheet = $("ankiSheet");
+        sheet.classList.remove("settling");
+        void sheet.offsetWidth;
+        sheet.classList.add("settling");
+      }
+
+      if (ankiLoadError || !ankiCards.length) {
+        $("ankiCardContent").classList.add("hidden");
+        $("showAnswerWrap").classList.add("hidden");
+        $("rateWrap").classList.add("hidden");
+        $("ankiEmptyState").classList.remove("hidden");
+        $("ankiEmptyActions").classList.remove("hidden");
+        $("kbdHints").classList.add("hidden");
+
+        const isLive = Boolean(ankiData?.ankiconnect);
+        const total = ankiData?.total_cards || 0;
+
+        if (ankiLoadError) {
+          $("ankiEmptyTitle").textContent = "Couldn’t load cards";
+          $("ankiEmptyDesc").textContent = "Check that Agent Focus is running and try again.";
+          $("emptyPrimaryBtn").textContent = "Retry";
+          $("emptyPrimaryBtn").onclick = loadAnki;
+          $("emptySecondaryBtn").classList.add("hidden");
+        } else if (!isLive) {
+          $("ankiEmptyTitle").textContent = "Anki is closed";
+          $("ankiEmptyDesc").textContent = "Open Anki to study. Reviews save to your collection.";
+          $("emptyPrimaryBtn").textContent = "Open Anki";
+          $("emptyPrimaryBtn").onclick = launchAnki;
+          $("emptySecondaryBtn").classList.add("hidden");
+        } else if (total > 0 && ankiStudyMode !== "all") {
+          $("ankiEmptyTitle").textContent = "Nothing due";
+          $("ankiEmptyDesc").textContent = "Sync to pull phone reviews, or study all cards.";
+          $("emptyPrimaryBtn").textContent = "Sync";
+          $("emptyPrimaryBtn").onclick = syncAnkiNow;
+          $("emptySecondaryBtn").textContent = "Study all cards";
+          $("emptySecondaryBtn").classList.remove("hidden");
+          $("emptySecondaryBtn").onclick = () => {
+            SFX.tick();
+            ankiStudyMode = "all";
+            localStorage.setItem("agentFocusStudyMode", ankiStudyMode);
+            updateStudyModeButtons();
+            loadAnki();
+          };
+        } else {
+          $("ankiEmptyTitle").textContent = "No cards yet";
+          $("ankiEmptyDesc").textContent = "Sync to pull your decks from AnkiWeb.";
+          $("emptyPrimaryBtn").textContent = "Sync";
+          $("emptyPrimaryBtn").onclick = syncAnkiNow;
+          $("emptySecondaryBtn").classList.add("hidden");
+        }
+        return;
+      }
+
+      $("ankiEmptyState").classList.add("hidden");
+      $("ankiEmptyActions").classList.add("hidden");
+      $("ankiCardContent").classList.remove("hidden");
+      $("kbdHints").classList.remove("hidden");
+
+      const card = ankiCards[ankiIndex % ankiCards.length];
+      $("cardDeckLabel").textContent = card.deck;
+      $("cardIndexLabel").textContent = `${(ankiIndex % ankiCards.length) + 1} / ${ankiCards.length}`;
+      $("cardFront").innerHTML = card.front;
+      $("cardBack").innerHTML = card.back;
+      renderMathIn($("cardFront"));
+      renderMathIn($("cardBack"));
+      wrapCardImages($("cardFront"));
+      wrapCardImages($("cardBack"));
+
+      const intervals = card.next_reviews || [];
+      $("lbl-again").textContent = intervals[0] ? `${intervals[0]} · 1` : "1";
+      $("lbl-hard").textContent = intervals[1] ? `${intervals[1]} · 2` : "2";
+      $("lbl-good").textContent = intervals[2] ? `${intervals[2]} · 3` : "3";
+      $("lbl-easy").textContent = intervals[3] ? `${intervals[3]} · 4` : "4";
+
+      $("cardDivider").classList.toggle("hidden", !ankiRevealed);
+      $("cardBack").classList.toggle("hidden", !ankiRevealed);
+      $("showAnswerWrap").classList.toggle("hidden", ankiRevealed);
+      $("rateWrap").classList.toggle("hidden", !ankiRevealed);
+
+      $("hintFlip").classList.toggle("hidden", ankiRevealed);
+      $("hintRate").classList.toggle("hidden", !ankiRevealed);
+      $("hintSkip").classList.toggle("hidden", ankiRevealed);
+    }
+
+    async function syncAnkiNow() {
+      const btn = $("syncAnkiBtn");
+      const emptyBtn = $("emptyPrimaryBtn");
+      const swap = $("syncIconSwap");
+      const label = $("syncAnkiText");
+      btn.disabled = true;
+      emptyBtn.disabled = true;
+      label.textContent = "Syncing…";
+      try {
+        const res = await fetch("/api/anki/sync", { method: "POST" });
+        if (res.ok) {
+          SFX.confirm();
+          swap.setAttribute("data-swapped", "true");
+          label.textContent = "Synced";
+          await loadAnki();
+          setTimeout(() => {
+            swap.setAttribute("data-swapped", "false");
+            label.textContent = "Sync";
+          }, 1500);
+        } else {
+          label.textContent = "Failed";
+          setTimeout(() => { label.textContent = "Sync"; }, 1800);
+        }
+      } finally {
+        btn.disabled = false;
+        emptyBtn.disabled = false;
+      }
+    }
+
+    async function launchAnki() {
+      const btn = $("emptyPrimaryBtn");
+      btn.disabled = true;
+      btn.textContent = "Opening Anki…";
+      try {
+        await fetch("/api/anki/launch", { method: "POST" });
+        await loadAnki();
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function revealAnki(moveFocus = false) {
+      if (!ankiCards.length || ankiRevealed) return;
+      SFX.flip();
+      userEngaged = true;
+      cancelRestoreCountdown();
+      ankiRevealed = true;
+      renderAnkiCard(false);
+      if (moveFocus) {
+        document.querySelector('.rate-btn[data-ease="good"]')?.focus();
+      }
+    }
+
+    async function rateAnki(ease, moveFocus = false, triggerBtn = null) {
+      if (!ankiCards.length || !ankiRevealed) return;
+      userEngaged = true;
+      const idx = ankiIndex % ankiCards.length;
+      const card = ankiCards[idx];
+      const origin = triggerBtn || document.querySelector(`.rate-btn[data-ease="${ease}"]`);
+
+      ankiCards.splice(idx, 1);
+      if (ease === "again") {
+        sessionStreak = 0;
+        SFX.rateAgain();
+        ankiCards.splice(Math.min(2, ankiCards.length), 0, card);
+      } else if (ease === "hard") {
+        sessionStreak += 1;
+        SFX.rateHard();
+        if (ankiStudyMode === "all") ankiCards.splice(Math.min(6, ankiCards.length), 0, card);
+      } else if (ease === "good") {
+        sessionStreak += 1;
+        if (ankiCards.length === 0 || sessionStreak % 5 === 0) {
+          SFX.celebrate();
+          emitSparks(origin, ["oklch(0.75 0.17 68)", "oklch(0.56 0.13 152)", "oklch(0.84 0.12 78)"], 18);
+        } else {
+          SFX.rateGood();
+          emitSparks(origin, ["oklch(0.56 0.13 152)", "oklch(0.75 0.17 68)"], 10);
+        }
+      } else if (ease === "easy") {
+        sessionStreak += 1;
+        if (ankiCards.length === 0 || sessionStreak % 5 === 0) {
+          SFX.celebrate();
+          emitSparks(origin, ["oklch(0.75 0.17 68)", "oklch(0.56 0.13 152)", "oklch(0.86 0.11 82)"], 20);
+        } else {
+          SFX.rateEasy();
+          emitSparks(origin, ["oklch(0.75 0.17 68)", "oklch(0.86 0.11 82)", "oklch(0.56 0.13 152)"], 14);
+        }
+      }
+
+      if (ankiData) ankiData.reviewed_today = (ankiData.reviewed_today || 0) + 1;
+      ankiRevealed = false;
+      renderAnkiCard(true);
+      if (moveFocus && ankiCards.length) {
+        $("showAnswerBtn").focus();
+      }
+
+      const res = await fetch("/api/anki/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ card_id: card.id, ease }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (typeof data.reviewed_today === "number" && ankiData) {
+        ankiData.reviewed_today = data.reviewed_today;
+        $("ankiReviewedMeta").textContent = `${data.reviewed_today} reviewed today`;
+      }
+    }
+
+    $("modeDueBtn").addEventListener("click", () => {
+      if (ankiStudyMode === "due") return;
+      SFX.tick();
+      ankiStudyMode = "due";
+      localStorage.setItem("agentFocusStudyMode", ankiStudyMode);
+      updateStudyModeButtons();
+      loadAnki();
+    });
+
+    $("modeAllBtn").addEventListener("click", () => {
+      if (ankiStudyMode === "all") return;
+      SFX.tick();
+      ankiStudyMode = "all";
+      localStorage.setItem("agentFocusStudyMode", ankiStudyMode);
+      updateStudyModeButtons();
+      loadAnki();
+    });
+
+    $("syncAnkiBtn").addEventListener("click", syncAnkiNow);
+    $("showAnswerBtn").addEventListener("click", () => revealAnki(true));
+    $("skipCardBtn").addEventListener("click", () => {
+      if (!ankiCards.length) return;
+      SFX.tick();
+      ankiIndex = (ankiIndex + 1) % ankiCards.length;
+      ankiRevealed = false;
+      renderAnkiCard(true);
+    });
+
+    document.querySelectorAll(".rate-btn").forEach((btn) => {
+      btn.addEventListener("click", () => rateAnki(btn.dataset.ease, true, btn));
+    });
+
+    // --- Modal Lightbox with Focus Management ---
+    function openLightbox(src, alt, triggerEl) {
+      SFX.tick();
+      lightboxTriggerEl = triggerEl || document.activeElement;
+      document.querySelector(".shell")?.setAttribute("inert", "");
+      $("lightboxImg").src = src;
+      $("lightboxImg").alt = alt;
+      $("lightbox").setAttribute("data-open", "true");
+      $("lightboxClose").focus();
+    }
+
+    function closeLightbox() {
+      $("lightbox").setAttribute("data-open", "false");
+      document.querySelector(".shell")?.removeAttribute("inert");
+      if (lightboxTriggerEl && typeof lightboxTriggerEl.focus === "function") {
+        lightboxTriggerEl.focus();
+      }
+      lightboxTriggerEl = null;
+    }
+
+    $("lightboxClose").addEventListener("click", closeLightbox);
+    $("lightbox").addEventListener("click", (e) => {
+      if (e.target === $("lightbox")) closeLightbox();
+    });
+
+    // Global keyboard shortcuts
+    document.addEventListener("keydown", (e) => {
+      if ($("lightbox").getAttribute("data-open") === "true") {
+        if (e.key === "Escape") { e.preventDefault(); closeLightbox(); }
+        else if (e.key === "Tab") { e.preventDefault(); $("lightboxClose").focus(); }
+        return;
+      }
+
+      if (e.repeat) return;
+
+      const target = e.target;
+      const tag = (target?.tagName || "").toLowerCase();
+      if (tag === "textarea" || tag === "input") return;
+      if (!$("panel-anki").classList.contains("active") || !ankiCards.length) return;
+
+      const interactiveFocused =
+        tag === "button" || tag === "a" || target?.getAttribute?.("role") === "tab" || target?.getAttribute?.("role") === "combobox";
+
+      if (e.code === "Space" && !interactiveFocused) {
+        e.preventDefault();
+        if (!ankiRevealed) revealAnki(true);
+      } else if ((e.key === "s" || e.key === "S") && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        SFX.tick();
+        ankiIndex = (ankiIndex + 1) % ankiCards.length;
+        ankiRevealed = false;
+        renderAnkiCard(true);
+      } else if (ankiRevealed && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (e.key === "1") rateAnki("again", true);
+        if (e.key === "2") rateAnki("hard", true);
+        if (e.key === "3") rateAnki("good", true);
+        if (e.key === "4") rateAnki("easy", true);
+      }
+    });
+
+    loadAnki();
+
+    // --- SCRATCHPAD ---
+    let padSaveTimer = null;
+    fetch("/api/scratchpad").then((r) => r.json()).then((d) => { $("padArea").value = d.text || ""; });
+
+    function savePadText(text) {
+      return fetch("/api/scratchpad", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+    }
+
+    $("padArea").addEventListener("input", () => {
+      userEngaged = true;
+      cancelRestoreCountdown();
+      $("padStatus").textContent = "Saving…";
+      clearTimeout(padSaveTimer);
+      padSaveTimer = setTimeout(async () => {
+        await savePadText($("padArea").value);
+        $("padStatus").textContent = "Saved";
+      }, 300);
+    });
+
+    // Cmd/Ctrl + Enter submits Scratchpad to Obsidian (emil-forms-and-inputs)
+    $("padArea").addEventListener("keydown", (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        $("obsidianPadBtn").click();
+      }
+    });
+
+    $("copyPadBtn").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText($("padArea").value);
+        SFX.confirm();
+        $("copyIconSwap").setAttribute("data-swapped", "true");
+        $("copyPadText").textContent = "Copied";
+        setTimeout(() => {
+          $("copyIconSwap").setAttribute("data-swapped", "false");
+          $("copyPadText").textContent = "Copy";
+        }, 1500);
+      } catch (_) {}
+    });
+
+    $("obsidianPadBtn").addEventListener("click", async () => {
+      const text = $("padArea").value.trim();
+      if (!text) return;
+      const btn = $("obsidianPadBtn");
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/scratchpad/obsidian", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          SFX.rateGood();
+          emitSparks(btn, ["oklch(0.75 0.17 68)", "oklch(0.56 0.13 152)"], 12);
+          $("padStatus").textContent = "Appended to Obsidian";
+        } else {
+          $("padStatus").textContent = "Couldn’t append to Obsidian";
+        }
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    $("clearPadBtn").addEventListener("click", async () => {
+      const prev = $("padArea").value;
+      if (!prev) return;
+      SFX.tick();
+      $("padArea").value = "";
+      await savePadText("");
+      $("padStatus").textContent = "Cleared";
+      showUndo("Note cleared", async () => {
+        $("padArea").value = prev;
+        await savePadText(prev);
+        $("padStatus").textContent = "Restored";
+      });
+    });
+
+    // =========================================================================
+    // REST TAB — SLOW COHERENT BREATHING DIAL (Full-cycle unhurried sweep)
+    // =========================================================================
+    const CADENCES = {
+      slow: [
+        { name: "Inhale", sec: 5.5, dir: "in" },
+        { name: "Exhale", sec: 5.5, dir: "out" },
+      ],
+      calm: [
+        { name: "Inhale", sec: 4, dir: "in" },
+        { name: "Hold",   sec: 4, dir: "hold_in" },
+        { name: "Exhale", sec: 6, dir: "out" },
+      ],
+      box: [
+        { name: "Inhale", sec: 4, dir: "in" },
+        { name: "Hold",   sec: 4, dir: "hold_in" },
+        { name: "Exhale", sec: 4, dir: "out" },
+        { name: "Rest",   sec: 4, dir: "hold_out" },
+      ],
+    };
+
+    const DIAL_CIRC = 2 * Math.PI * 102;
+    let activeCadenceKey = localStorage.getItem("agentFocusCadence") || "slow";
+    if (!CADENCES[activeCadenceKey]) activeCadenceKey = "slow";
+    let breathRunning = true;
+    let breathAudioOn = false;
+    let breathCycleStart = 0;
+    let breathLastPhaseIdx = -1;
+    let breathCyclesDone = 0;
+    let breathRaf = null;
+
+    // Generate 60 precision radial tick marks on the breathing dial
+    (function buildDialTicks() {
+      const g = $("dialTicks");
+      const cx = 124, cy = 124;
+      let svg = "";
+      for (let i = 0; i < 60; i++) {
+        const angle = (i / 60) * Math.PI * 2 - Math.PI / 2;
+        const isMajor = i % 5 === 0;
+        const r1 = isMajor ? 111 : 114;
+        const r2 = 120;
+        const x1 = (cx + Math.cos(angle) * r1).toFixed(2);
+        const y1 = (cy + Math.sin(angle) * r1).toFixed(2);
+        const x2 = (cx + Math.cos(angle) * r2).toFixed(2);
+        const y2 = (cy + Math.sin(angle) * r2).toFixed(2);
+        svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="dial-tick${isMajor ? " major" : ""}" stroke-width="${isMajor ? 1.4 : 0.9}" />`;
+      }
+      g.innerHTML = svg;
+    })();
+
+    function cycleTotalSec(key) {
+      return CADENCES[key].reduce((acc, p) => acc + p.sec, 0);
+    }
+
+    function renderPhaseStrip(activeIdx = 0) {
+      const phases = CADENCES[activeCadenceKey];
+      $("phaseStrip").innerHTML = phases.map((p, idx) => (
+        `<span class="phase-step${idx === activeIdx ? " active" : ""}">${p.name} ${p.sec}s</span>`
+      )).join("");
+    }
+
+    function setBloomLevel(level) {
+      const outer = $("bloomOuter");
+      const mid = $("bloomMid");
+      const core = $("bloomCore");
+      if (prefersReducedMotion.matches) {
+        outer.style.transform = "scale(1)";
+        mid.style.transform = "scale(1)";
+        core.style.transform = "scale(1)";
+        return;
+      }
+      // Subtle, gentle lung-like amplitude (no dramatic jumps)
+      const sOuter = 0.88 + 0.28 * level;
+      const sMid = 0.90 + 0.20 * level;
+      const sCore = 0.95 + 0.08 * level;
+      outer.style.transform = `scale(${sOuter.toFixed(4)})`;
+      outer.style.opacity = (0.35 + 0.42 * level).toFixed(3);
+      mid.style.transform = `scale(${sMid.toFixed(4)})`;
+      mid.style.opacity = (0.48 + 0.36 * level).toFixed(3);
+      core.style.transform = `scale(${sCore.toFixed(4)})`;
+    }
+
+    function tickRest(now) {
+      if (!breathRunning || !$("panel-rest").classList.contains("active")) {
+        breathRaf = null;
+        return;
+      }
+      const phases = CADENCES[activeCadenceKey];
+      const totalSec = cycleTotalSec(activeCadenceKey);
+      let cycleElapsed = (now - breathCycleStart) / 1000;
+
+      if (cycleElapsed >= totalSec) {
+        const completed = Math.floor(cycleElapsed / totalSec);
+        breathCyclesDone += completed;
+        breathCycleStart += completed * totalSec * 1000;
+        cycleElapsed = (now - breathCycleStart) / 1000;
+        $("breathCycles").textContent = `${breathCyclesDone} ${breathCyclesDone === 1 ? "cycle" : "cycles"}`;
+      }
+
+      // Single unhurried sweep around the dial per ENTIRE breath cycle (11–16s)
+      const cycleFrac = Math.min(1, cycleElapsed / totalSec);
+      $("dialProgress").style.strokeDashoffset = String(DIAL_CIRC * (1 - cycleFrac));
+
+      // Locate current phase and sinusoidal lung level
+      let acc = 0;
+      let phaseIdx = 0;
+      let phaseFrac = 0;
+      for (let i = 0; i < phases.length; i++) {
+        if (cycleElapsed <= acc + phases[i].sec || i === phases.length - 1) {
+          phaseIdx = i;
+          phaseFrac = Math.min(1, Math.max(0, (cycleElapsed - acc) / phases[i].sec));
+          break;
+        }
+        acc += phases[i].sec;
+      }
+
+      const p = phases[phaseIdx];
+      if (phaseIdx !== breathLastPhaseIdx) {
+        breathLastPhaseIdx = phaseIdx;
+        $("breathPhaseName").textContent = p.name;
+        renderPhaseStrip(phaseIdx);
+        SFX.breath(p.name);
+      }
+
+      // Smooth sinusoidal ease: velocity approaches 0 naturally at inhale peak & exhale trough
+      const sine = 0.5 - 0.5 * Math.cos(Math.PI * phaseFrac);
+      let level = 0;
+      if (p.dir === "in") level = sine;
+      else if (p.dir === "hold_in") level = 1;
+      else if (p.dir === "out") level = 1 - sine;
+      else level = 0;
+
+      setBloomLevel(level);
+      breathRaf = requestAnimationFrame(tickRest);
+    }
+
+    function startRestLoop() {
+      if (!breathRunning) return;
+      breathCycleStart = performance.now();
+      breathLastPhaseIdx = -1;
+      if (breathRaf) cancelAnimationFrame(breathRaf);
+      breathRaf = requestAnimationFrame(tickRest);
+    }
+
+    function pauseRestLoop(userInitiated = false) {
+      if (userInitiated) breathRunning = false;
+      if (breathRaf) {
+        cancelAnimationFrame(breathRaf);
+        breathRaf = null;
+      }
+      $("breathToggleBtn").textContent = breathRunning ? "Pause" : "Resume";
+      $("breathToggleBtn").setAttribute("aria-pressed", String(breathRunning));
+    }
+
+    document.querySelectorAll("[data-cadence]").forEach((btn) => {
+      const key = btn.dataset.cadence;
+      const isActive = key === activeCadenceKey;
+      btn.classList.toggle("active", isActive);
+      btn.setAttribute("aria-pressed", String(isActive));
+      btn.addEventListener("click", () => {
+        if (activeCadenceKey === key) return;
+        SFX.tick();
+        activeCadenceKey = key;
+        localStorage.setItem("agentFocusCadence", key);
+        document.querySelectorAll("[data-cadence]").forEach((b) => {
+          const on = b.dataset.cadence === key;
+          b.classList.toggle("active", on);
+          b.setAttribute("aria-pressed", String(on));
+        });
+        breathLastPhaseIdx = -1;
+        renderPhaseStrip(0);
+        if (breathRunning) startRestLoop();
+        else {
+          $("breathPhaseName").textContent = CADENCES[key][0].name;
+          setBloomLevel(0);
+          $("dialProgress").style.strokeDashoffset = String(DIAL_CIRC);
+        }
+      });
+    });
+
+    $("breathToggleBtn").addEventListener("click", () => {
+      SFX.tick();
+      breathRunning = !breathRunning;
+      $("breathToggleBtn").textContent = breathRunning ? "Pause" : "Resume";
+      $("breathToggleBtn").setAttribute("aria-pressed", String(breathRunning));
+      if (breathRunning) startRestLoop();
+      else pauseRestLoop(true);
+    });
+
+    $("breathAudioBtn").addEventListener("click", () => {
+      breathAudioOn = !breathAudioOn;
+      $("breathAudioBtn").setAttribute("aria-pressed", String(breathAudioOn));
+      $("breathAudioSwap").setAttribute("data-swapped", String(breathAudioOn));
+      if (breathAudioOn) SFX.breath("Inhale");
+      else SFX.tick();
+    });
+
+    renderPhaseStrip(0);
+
+    // Activate persisted (or ?tab=) tab after all modules are initialized
+    const tabParam = params.get("tab");
+    const initialTab = (tabParam && document.getElementById(`panel-${tabParam}`)) ? tabParam : (localStorage.getItem("agentFocusTab") || "anki");
+    setActiveTab(document.getElementById(`panel-${initialTab}`) ? initialTab : "anki", false, false);
+  </script>
+</body>
+</html>
