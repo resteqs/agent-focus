@@ -9,6 +9,7 @@ import tempfile
 import threading
 import time
 import unittest
+import urllib.parse
 from datetime import date, timedelta
 from pathlib import Path
 from unittest import mock
@@ -578,10 +579,10 @@ class HttpApiTest(unittest.TestCase):
             self.assertEqual(self.request("GET", f"/api/anki/media/{name}")[0], 400, name)
 
     def test_focus_app_opens_only_valid_app_names(self):
-        with mock.patch.object(server.subprocess, "Popen") as popen:
+        with mock.patch.object(server.subprocess, "Popen") as popen, mock.patch.object(server, "PLATFORM", "darwin"):
             status, data = self.post("/api/focus-app", {"app": "Orca"})
             self.assertEqual((status, data["app"]), (200, "Orca"))
-            popen.assert_called_once_with(["/usr/bin/open", "-a", "Orca"])
+            popen.assert_called_once_with(["/usr/bin/open", "-a", "Orca"], env=None)
             popen.reset_mock()
 
             for app in ("Orca; rm -rf ~", "$(reboot)", "-a", "../../Applications/X", "a" * 49, "Orca\nTerminal"):
@@ -591,9 +592,9 @@ class HttpApiTest(unittest.TestCase):
 
     def test_focus_app_defaults_to_return_app(self):
         self.state.config["return_app"] = "Visual Studio Code"
-        with mock.patch.object(server.subprocess, "Popen") as popen:
+        with mock.patch.object(server.subprocess, "Popen") as popen, mock.patch.object(server, "PLATFORM", "darwin"):
             self.assertEqual(self.post("/api/focus-app", {})[1]["app"], "Visual Studio Code")
-        popen.assert_called_once_with(["/usr/bin/open", "-a", "Visual Studio Code"])
+        popen.assert_called_once_with(["/usr/bin/open", "-a", "Visual Studio Code"], env=None)
 
     def test_malformed_requests_get_400(self):
         self.assertEqual(self.post("/api/pause", b"{not json")[0], 400)
@@ -610,6 +611,53 @@ class HttpApiTest(unittest.TestCase):
         self.assertEqual(status, 403)
         status, _ = self.request("GET", "/api/scratchpad", headers={"Host": f"evil.example:{self.port}"})
         self.assertEqual(status, 403)
+
+    def test_intercept_redirects_blocked_tabs_and_starts_the_cooldown(self):
+        self.post("/api/focus", {"enabled": True})
+        before = self.state.intercept_count_today
+        status, data = self.post("/api/intercept", {"url": "https://www.reddit.com/r/python"})
+        self.assertEqual((status, data["blocked"], data["domain"]), (200, True, "reddit.com"))
+        target = urllib.parse.urlparse(data["redirect_url"])
+        self.assertEqual(target.netloc, f"{server.HOST}:{self.state.config['port']}")
+        query = urllib.parse.parse_qs(target.query)
+        self.assertEqual((query["from"], query["domain"]), (["https://www.reddit.com/r/python"], ["reddit.com"]))
+        self.assertIn("reddit.com", self.state.intercept_started)
+        self.assertEqual(self.state.intercept_count_today, before + 1)
+        self.assertEqual(self.post("/api/bypass", {"domain": "reddit.com"})[0], 429)  # cooldown is running
+
+    def test_intercept_lets_bypassed_and_unlisted_sites_through(self):
+        self.post("/api/focus", {"enabled": True})
+        self.state.bypasses["reddit.com"] = time.time() + 60
+        for url in ("https://reddit.com/", "https://example.com/", "http://127.0.0.1:7842/"):
+            with self.subTest(url=url):
+                self.assertEqual(self.post("/api/intercept", {"url": url}), (200, {"blocked": False}))
+        self.assertEqual(self.state.intercept_count_today, 0)
+
+    def test_intercept_does_nothing_while_idle(self):
+        self.assertEqual(self.post("/api/intercept", {"url": "https://reddit.com/"}), (200, {"blocked": False}))
+        self.assertEqual(self.state.intercept_started, {})
+        self.assertEqual(self.post("/api/intercept", {})[0], 400)
+
+    def test_extension_origins_reach_only_status_and_intercept(self):
+        for origin in ("chrome-extension://abcdefghijklmnop", "moz-extension://0d5e2a7c-1111-2222-3333-444455556666"):
+            with self.subTest(origin=origin):
+                headers = {"Origin": origin}
+                self.assertEqual(self.post("/api/intercept", {"url": "https://reddit.com/"}, headers=headers)[0], 200)
+                self.assertEqual(self.request("GET", "/api/status", headers=headers)[0], 200)
+                self.assertEqual(self.post("/api/config", {"add_domain": "a.com"}, headers=headers)[0], 403)
+                self.assertEqual(self.post("/api/focus-app", {"app": "Terminal"}, headers=headers)[0], 403)
+                self.assertEqual(self.post("/api/agent/clear", headers=headers)[0], 403)
+                self.assertEqual(self.request("GET", "/api/scratchpad", headers=headers)[0], 403)
+
+    def test_web_origins_are_rejected_everywhere(self):
+        for origin in ("https://evil.com", "http://evil.com", "null", "file://"):
+            with self.subTest(origin=origin):
+                headers = {"Origin": origin}
+                self.assertEqual(self.post("/api/intercept", {"url": "https://reddit.com/"}, headers=headers)[0], 403)
+                self.assertEqual(self.post("/api/config", {"add_domain": "a.com"}, headers=headers)[0], 403)
+                self.assertEqual(self.post("/api/focus-app", {"app": "Terminal"}, headers=headers)[0], 403)
+        bad_host = {"Origin": "chrome-extension://abc", "Host": f"evil.example:{self.port}"}
+        self.assertEqual(self.post("/api/intercept", {"url": "https://reddit.com/"}, headers=bad_host)[0], 403)
 
     def test_same_origin_requests_are_allowed(self):
         for origin in (f"http://127.0.0.1:{self.port}", f"http://localhost:{self.port}"):

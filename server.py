@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Agent Focus daemon.
 
-While a coding agent (Claude Code, Codex, Antigravity) is working, polls Safari's active
-tabs over AppleScript and redirects blocked sites to the wait-state page served on 127.0.0.1.
+While a coding agent (Claude Code, Codex, Antigravity) is working, blocked sites are redirected
+to the wait-state page served on 127.0.0.1. On macOS a thread polls Safari over AppleScript;
+Chromium browsers and Firefox (any OS) use the extension in extension/, which asks /api/intercept.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import mimetypes
 import os
 import queue
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -29,6 +31,7 @@ from ankistore import (
     ANKI_AVAILABLE,
     AnkiStore,
     FullSyncConflict,
+    default_data_root,
     SyncError,
     is_auth_error,
 )
@@ -36,9 +39,8 @@ from ankistore import (
 HOST = "127.0.0.1"
 APP_DIR = Path(__file__).resolve().parent
 STATIC_DIR = APP_DIR / "static"
-DATA_DIR = Path(
-    os.environ.get("AGENT_FOCUS_DATA_DIR") or (Path.home() / ".local/share/agent-focus")
-).expanduser()
+PLATFORM = sys.platform  # darwin | win32 | linux; tests patch this
+DATA_DIR = Path(os.environ.get("AGENT_FOCUS_DATA_DIR") or (default_data_root() / "agent-focus")).expanduser()
 CONFIG_PATH = DATA_DIR / "config.json"
 SCRATCHPAD_PATH = DATA_DIR / "scratchpad.md"
 ANKI_PROGRESS_PATH = DATA_DIR / "anki_progress.json"
@@ -60,7 +62,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "return_app": "Orca",
     "completion_chime": True,
     "obsidian_note_path": "",
-    "anki_headless_home": str(Path.home() / ".local/share/anki-headless"),
+    "anki_headless_home": str(default_data_root() / "anki-headless"),
     "anki_headless_profile": "agent-focus",
     "anki_sync_endpoint": "",
     "blocked_domains": [
@@ -86,9 +88,16 @@ class BadRequest(ValueError):
 
 
 def log(msg: str) -> None:
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    sys.stderr.write(f"[{ts}] {msg}\n")
-    sys.stderr.flush()
+    line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}\n"
+    if sys.stderr is not None:
+        sys.stderr.write(line)
+        sys.stderr.flush()
+        return
+    try:  # pythonw.exe (the Windows background task) has no stderr
+        with open(DATA_DIR / "server.log", "a", encoding="utf-8") as f:
+            f.write(line)
+    except OSError:
+        pass
 
 
 def today() -> str:
@@ -132,6 +141,8 @@ def int_field(body: dict[str, Any], key: str, default: int = 0) -> int:
 
 
 def pid_alive(pid: int) -> bool:
+    if PLATFORM == "win32":
+        return _pid_alive_windows(pid)
     try:
         os.kill(pid, 0)
     except PermissionError:
@@ -139,6 +150,47 @@ def pid_alive(pid: int) -> bool:
     except (ProcessLookupError, OverflowError):
         return False
     return True
+
+
+def _pid_alive_windows(pid: int) -> bool:
+    import ctypes
+
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    STILL_ACTIVE = 259
+    kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return ctypes.GetLastError() == 5  # ERROR_ACCESS_DENIED: it exists, it just isn't ours
+    try:
+        code = ctypes.c_ulong()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+            return True
+        return code.value == STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def focus_app_command(app_name: str) -> tuple[list[str], dict[str, str]] | None:
+    """The command that brings `app_name` forward on this OS, or None when nothing can.
+
+    The name never reaches a shell: it is an argv item, or on Windows an environment variable.
+    """
+    if PLATFORM == "darwin":
+        return ["/usr/bin/open", "-a", app_name], {}
+    if PLATFORM == "win32":
+        script = "(New-Object -ComObject WScript.Shell).AppActivate($env:AGENT_FOCUS_APP) | Out-Null"
+        argv = ["powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script]
+        return argv, {"AGENT_FOCUS_APP": app_name}
+    if shutil.which("wmctrl"):
+        return ["wmctrl", "-a", app_name], {}
+    if shutil.which("xdotool"):
+        return ["xdotool", "search", "--name", app_name, "windowactivate"], {}
+    return None
+
+
+def wait_page_url(port: int, url: str, domain: str, started: float) -> str:
+    query = urllib.parse.urlencode({"from": url, "domain": domain, "t": str(int(started))})
+    return f"http://{HOST}:{port}/?{query}"
 
 
 def rewrite_media_urls(markup: str) -> str:
@@ -613,7 +665,10 @@ STATE = FocusState()
 
 
 class SafariWatcher(threading.Thread):
-    """Polls the active tab of every Safari window, only while blocking is active."""
+    """Prunes stale sessions and, on macOS, polls the active tab of every Safari window while blocking.
+
+    Elsewhere the browser extension reports tabs through /api/intercept, so only the pruning runs.
+    """
 
     GET_TABS_SCRIPT = r'''
 if application "Safari" is running then
@@ -656,9 +711,10 @@ on run argv
 end run
 '''
 
-    def __init__(self, state: FocusState) -> None:
+    def __init__(self, state: FocusState, poll_safari: bool | None = None) -> None:
         super().__init__(daemon=True)
         self.state = state
+        self.poll_safari = PLATFORM == "darwin" if poll_safari is None else poll_safari
         self.stop_event = threading.Event()
         self._last_prune = time.time()
         self._last_osa_err = 0.0
@@ -681,7 +737,7 @@ end run
         return ""
 
     def run(self) -> None:
-        log("SafariWatcher thread started.")
+        log("SafariWatcher thread started." if self.poll_safari else "Session watcher started (Safari polling is macOS-only).")
         while not self.stop_event.is_set():
             now = time.time()
             if now - self._last_prune >= 2.0:
@@ -691,7 +747,7 @@ end run
                 if changed:
                     self.state.broadcast("state")
 
-            if not self.state.is_blocking_active():
+            if not self.poll_safari or not self.state.is_blocking_active():
                 self.stop_event.wait(0.6)
                 continue
 
@@ -702,8 +758,8 @@ end run
                 if not domain:
                     continue
                 started = self.state.record_intercept(domain, url)
-                query = urllib.parse.urlencode({"from": url, "domain": domain, "t": str(int(started))})
-                if self._run_osascript(self.REDIRECT_TAB_SCRIPT, [win_idx.strip(), url, f"http://{HOST}:{port}/?{query}"]) == "redirected":
+                target = wait_page_url(port, url, domain, started)
+                if self._run_osascript(self.REDIRECT_TAB_SCRIPT, [win_idx.strip(), url, target]) == "redirected":
                     log(f"Intercepted Safari tab: {domain} ({url[:80]})")
 
             self.stop_event.wait(max(0.25, float(self.state.config.get("poll_interval_ms", 450)) / 1000.0))
@@ -728,13 +784,22 @@ class RequestHandler(BaseHTTPRequestHandler):
         port = self.server.server_address[1]
         return {f"{HOST}:{port}", f"localhost:{port}"}
 
-    def _foreign_request(self) -> bool:
+    # The browser extension may call only these two: read state, and report a tab it wants checked.
+    EXTENSION_ROUTES = {("GET", "/api/status"), ("POST", "/api/intercept")}
+    EXTENSION_SCHEMES = ("chrome-extension", "moz-extension")
+
+    def _foreign_request(self, method: str = "GET") -> bool:
         """Reject DNS-rebinding (Host) and cross-site requests (Origin) from other web pages."""
         allowed = self._allowed_hosts()
         if self.headers.get("Host") not in allowed:
             return True
         origin = self.headers.get("Origin")
-        return origin is not None and urllib.parse.urlparse(origin).netloc not in allowed
+        if origin is None:
+            return False
+        parsed = urllib.parse.urlparse(origin)
+        if parsed.scheme in self.EXTENSION_SCHEMES:
+            return (method, urllib.parse.urlparse(self.path).path) not in self.EXTENSION_ROUTES
+        return parsed.scheme not in ("http", "https") or parsed.netloc not in allowed
 
     def _send_json(self, data: Any, status: int = 200) -> None:
         body = json.dumps(data).encode("utf-8")
@@ -806,7 +871,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         self._serve_file(STATE.anki_store.media_dir / name)
 
     def do_POST(self) -> None:
-        if self._foreign_request():
+        if self._foreign_request("POST"):
             self._send_json({"ok": False, "error": "Cross-origin request rejected"}, status=403)
             return
         parsed = urllib.parse.urlparse(self.path)
@@ -1000,11 +1065,34 @@ def post_focus_app(body: dict[str, Any], _qs: dict[str, list[str]]) -> tuple[int
     app_name = str(body.get("app") or STATE.config.get("return_app") or "Orca").strip()
     if not APP_NAME_RE.fullmatch(app_name):
         raise BadRequest("Invalid app name")
+    command = focus_app_command(app_name)
+    if command is None:
+        return 501, {"ok": False, "error": "Install wmctrl or xdotool to focus apps on Linux"}
+    argv, extra_env = command
     try:
-        subprocess.Popen(["/usr/bin/open", "-a", app_name])
+        subprocess.Popen(argv, env={**os.environ, **extra_env} if extra_env else None)
     except OSError as e:
         return 500, {"ok": False, "error": str(e)}
     return 200, {"ok": True, "app": app_name}
+
+
+@post_route("/api/intercept")
+def post_intercept(body: dict[str, Any], _qs: dict[str, list[str]]) -> tuple[int, Any]:
+    """Called by the browser extension for a tab URL. Blocked tabs get the wait-page URL to load."""
+    url = str(body.get("url") or "").strip()
+    if not url:
+        raise BadRequest("url is required")
+    if not STATE.is_blocking_active():
+        return 200, {"blocked": False}
+    domain = STATE.match_blocked_domain(url)  # None for bypassed and local URLs
+    if not domain:
+        return 200, {"blocked": False}
+    started = STATE.record_intercept(domain, url)
+    return 200, {
+        "blocked": True,
+        "domain": domain,
+        "redirect_url": wait_page_url(int(STATE.config["port"]), url, domain, started),
+    }
 
 
 class FocusHTTPServer(ThreadingHTTPServer):

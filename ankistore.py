@@ -13,7 +13,6 @@ auth.json holds the sync key and endpoint, never the password, and is created 06
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import json
 import os
 import re
@@ -21,7 +20,13 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator, Sequence
+from typing import IO, Any, Iterator, Sequence
+
+IS_WINDOWS = os.name == "nt"  # tests patch this
+if IS_WINDOWS:
+    import msvcrt
+else:
+    import fcntl
 
 try:
     from anki.collection import Collection
@@ -78,6 +83,48 @@ def split_rendered_answer(answer_html: str) -> str:
     return parts[1].strip() if len(parts) == 2 else cleaned
 
 
+def default_data_root() -> Path:
+    """Per-user data folder: %LOCALAPPDATA% on Windows, ~/.local/share elsewhere."""
+    if IS_WINDOWS and os.environ.get("LOCALAPPDATA"):
+        return Path(os.environ["LOCALAPPDATA"])
+    return Path.home() / ".local" / "share"
+
+
+@contextlib.contextmanager
+def _file_lock(lock_file: IO[str]) -> Iterator[None]:
+    """Exclusive, blocking lock on an open file: flock on POSIX, msvcrt.locking on Windows."""
+    if IS_WINDOWS:
+        lock_file.seek(0)
+        while True:
+            try:
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)  # retries for ~10s, then raises
+                break
+            except OSError:
+                continue
+        try:
+            yield
+        finally:
+            lock_file.seek(0)
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+    else:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
+def write_private(path: Path, text: str) -> None:
+    """Write a secret file readable only by its owner. Windows has no POSIX modes; the profile folder is already per-user."""
+    if IS_WINDOWS:
+        path.write_text(text, encoding="utf-8")
+        return
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.chmod(path, 0o600)  # O_CREAT's mode is ignored when the file already exists
+
+
 def _require_anki() -> None:
     if not ANKI_AVAILABLE:
         raise RuntimeError("The 'anki' Python package is not installed.")
@@ -86,11 +133,11 @@ def _require_anki() -> None:
 class AnkiStore:
     def __init__(
         self,
-        home: str | os.PathLike[str] = "~/.local/share/anki-headless",
+        home: str | os.PathLike[str] | None = None,
         endpoint: str | None = None,
         profile: str = "agent-focus",
     ):
-        base = os.environ.get("ANKI_HEADLESS_HOME") or str(home)
+        base = os.environ.get("ANKI_HEADLESS_HOME") or str(home or default_data_root() / "anki-headless")
         self.profile = profile
         self.home = Path(base).expanduser() / profile
         self.home.mkdir(parents=True, exist_ok=True)
@@ -117,10 +164,7 @@ class AnkiStore:
         payload: dict[str, Any] = {"hkey": hkey, "endpoint": endpoint or None}
         if account:
             payload["account"] = account
-        fd = os.open(self.auth_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(json.dumps(payload, indent=2) + "\n")
-        os.chmod(self.auth_path, 0o600)  # O_CREAT's mode is ignored when the file already exists
+        write_private(self.auth_path, json.dumps(payload, indent=2) + "\n")
 
     def auth_info(self) -> dict[str, Any]:
         saved = self._read_auth()
@@ -174,8 +218,7 @@ class AnkiStore:
     @contextlib.contextmanager
     def _open_locked(self) -> Iterator[Collection]:
         self.home.mkdir(parents=True, exist_ok=True)
-        with open(self.lock_path, "w") as lock_file:
-            fcntl.flock(lock_file, fcntl.LOCK_EX)
+        with open(self.lock_path, "w") as lock_file, _file_lock(lock_file):
             col = Collection(str(self.col_path))
             try:
                 yield col

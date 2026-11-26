@@ -5,6 +5,17 @@ PORT="${AGENT_FOCUS_PORT:-7842}"
 BASE="http://127.0.0.1:${PORT}"
 DATA_DIR="${AGENT_FOCUS_DATA_DIR:-$HOME/.local/share/agent-focus}"
 PLIST="$HOME/Library/LaunchAgents/com.agent-focus.daemon.plist"
+UNIT="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/agent-focus.service"
+OS="$(uname -s)"
+
+# Open a URL in the default browser, or in Safari on macOS when asked.
+open_url() {
+  if [ "$OS" = "Darwin" ]; then
+    if [ "${2:-}" = "safari" ]; then open -a Safari "$1"; else open "$1"; fi
+  else
+    xdg-open "$1" >/dev/null 2>&1 &
+  fi
+}
 VENV_PY="$DATA_DIR/venv/bin/python3"
 if [ -x "$VENV_PY" ]; then
   PY_BIN="$VENV_PY"
@@ -35,7 +46,7 @@ case "${1:-status}" in
     curl -s -X POST -H "Content-Type: application/json" -d '{"seconds":0}' "$BASE/api/pause" >/dev/null && echo "Resumed blocking."
     ;;
   open)
-    open "$BASE"
+    open_url "$BASE"
     ;;
   anki)
     SUB="${2:-status}"
@@ -102,8 +113,8 @@ PY
     curl -s -X POST -H "Content-Type: application/json" \
       -d "{\"session_id\":\"claude:$SID\",\"agent\":\"claude\",\"cwd\":\"$PWD\"}" \
       "$BASE/api/agent/start" >/dev/null
-    open -a Safari "$BASE/?from=https%3A%2F%2Fmail.proton.me&domain=mail.proton.me&t=$(date +%s)"
-    echo "Demo run started (claude:$SID) for ${SECS}s. Safari opened to the wait-state screen."
+    open_url "$BASE/?from=https%3A%2F%2Fmail.proton.me&domain=mail.proton.me&t=$(date +%s)" safari
+    echo "Demo run started (claude:$SID) for ${SECS}s. Opened the wait-state screen."
     (
       sleep "$SECS"
       curl -s -X POST -H "Content-Type: application/json" \
@@ -112,6 +123,14 @@ PY
     ) >/dev/null 2>&1 &
     ;;
   restart)
+    if [ "$OS" = "Linux" ]; then
+      if [ ! -f "$UNIT" ]; then
+        echo "No systemd user service found. Run ./install.sh first." >&2
+        exit 1
+      fi
+      systemctl --user restart agent-focus && echo "Restarted Agent Focus."
+      exit $?
+    fi
     if [ ! -f "$PLIST" ]; then
       echo "No LaunchAgent found. Run ./install.sh first." >&2
       exit 1

@@ -1,15 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# macOS (LaunchAgent) and Linux (systemd user service). Windows uses install.ps1.
 REPO_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+OS="$(uname -s)"
 DATA_DIR="${AGENT_FOCUS_DATA_DIR:-$HOME/.local/share/agent-focus}"
 BIN_DIR="$HOME/.local/bin"
 PLIST_PATH="$HOME/Library/LaunchAgents/com.agent-focus.daemon.plist"
+UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+UNIT_PATH="$UNIT_DIR/agent-focus.service"
 PY_BIN="$(command -v python3 || echo /opt/homebrew/bin/python3)"
 VENV_DIR="$DATA_DIR/venv"
 
-mkdir -p "$DATA_DIR" "$BIN_DIR" "$HOME/Library/LaunchAgents"
-chmod +x "$REPO_DIR/server.py" "$REPO_DIR/hooks/hook.sh" "$REPO_DIR/hooks/hook_dispatch.py" "$REPO_DIR/bin/agent-focus"
+case "$OS" in
+  Darwin|Linux) ;;
+  *) echo "Unsupported OS: $OS. On Windows, run install.ps1 in PowerShell." >&2; exit 1 ;;
+esac
+
+mkdir -p "$DATA_DIR" "$BIN_DIR"
+chmod +x "$REPO_DIR/server.py" "$REPO_DIR/hooks/hook.sh" "$REPO_DIR/hooks/hook_dispatch.py" "$REPO_DIR/hooks/wire_hooks.py" "$REPO_DIR/bin/agent-focus"
 
 # Optional venv with the `anki` package for direct AnkiWeb sync. AGENT_FOCUS_NO_VENV=1 skips it.
 ANKI_WARNING="Could not install the anki package. Agent Focus will run without direct AnkiWeb sync."
@@ -34,6 +43,9 @@ fi
 
 # Symlink CLI into ~/.local/bin
 ln -sf "$REPO_DIR/bin/agent-focus" "$BIN_DIR/agent-focus"
+
+if [ "$OS" = "Darwin" ]; then
+mkdir -p "$HOME/Library/LaunchAgents"
 
 # Write LaunchAgent pointing to this checkout
 cat > "$PLIST_PATH" <<PLIST
@@ -70,68 +82,36 @@ PLIST
 launchctl bootout "gui/$(id -u)" "$PLIST_PATH" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
 
+else
+# Linux: a systemd user service, restarted if it crashes, logging next to the config.
+mkdir -p "$UNIT_DIR"
+cat > "$UNIT_PATH" <<UNIT
+[Unit]
+Description=Agent Focus daemon
+After=default.target
+
+[Service]
+ExecStart="${PY_BIN}" "${REPO_DIR}/server.py"
+Environment=AGENT_FOCUS_DATA_DIR=${DATA_DIR}
+Restart=always
+RestartSec=2
+StandardOutput=append:${DATA_DIR}/server.log
+StandardError=append:${DATA_DIR}/server.log
+
+[Install]
+WantedBy=default.target
+UNIT
+
+systemctl --user daemon-reload
+systemctl --user enable --now agent-focus
+systemctl --user restart agent-focus
+fi
+
 # Wire Claude Code, Codex, and Antigravity hooks if those configs exist
-"$PY_BIN" - "$REPO_DIR/hooks/hook.sh" <<'PY'
-import json, shutil, sys
-from pathlib import Path
-
-HOOK = sys.argv[1]
-
-def save_atomic(path: Path, data: dict) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    tmp.replace(path)
-
-def replace_or_add_group(hooks_map: dict, event: str, cmd: str, extra: dict | None = None) -> None:
-    entries = hooks_map.setdefault(event, [])
-    # Repoint an existing agent-focus hook (e.g. after moving the checkout) instead of adding a second one.
-    for entry in entries:
-        for h in entry.get("hooks", []):
-            c = str(h.get("command", ""))
-            if "agent-focus" in c and c.endswith(cmd.split("hook.sh", 1)[1]):
-                h["command"] = cmd
-                return
-    handler = {"type": "command", "command": cmd, "timeout": 5}
-    if extra:
-        handler.update(extra)
-    entries.append({"hooks": [handler]})
-
-# 1. Claude Code
-claude_path = Path.home() / ".claude/settings.json"
-if claude_path.exists():
-    data = json.loads(claude_path.read_text(encoding="utf-8"))
-    hooks = data.setdefault("hooks", {})
-    replace_or_add_group(hooks, "UserPromptSubmit", f"{HOOK} claude start", {"async": True})
-    replace_or_add_group(hooks, "Stop", f"{HOOK} claude stop")
-    replace_or_add_group(hooks, "StopFailure", f"{HOOK} claude stop")
-    replace_or_add_group(hooks, "SessionEnd", f"{HOOK} claude stop")
-    save_atomic(claude_path, data)
-    print(f"Wired Claude Code hooks: {claude_path}")
-
-# 2. Codex
-codex_path = Path.home() / ".codex/hooks.json"
-if codex_path.exists():
-    data = json.loads(codex_path.read_text(encoding="utf-8"))
-    hooks = data.setdefault("hooks", {})
-    replace_or_add_group(hooks, "UserPromptSubmit", f"{HOOK} codex start")
-    replace_or_add_group(hooks, "Stop", f"{HOOK} codex stop")
-    replace_or_add_group(hooks, "Interrupt", f"{HOOK} codex stop")
-    save_atomic(codex_path, data)
-    print(f"Wired Codex hooks: {codex_path}")
-
-# 3. Antigravity
-agy_path = Path.home() / ".gemini/config/hooks.json"
-if agy_path.exists():
-    data = json.loads(agy_path.read_text(encoding="utf-8"))
-    data["agent-focus"] = {
-        "PreInvocation": [{"type": "command", "command": f"{HOOK} antigravity start", "timeout": 5}],
-        "Stop": [{"type": "command", "command": f"{HOOK} antigravity stop", "timeout": 5}],
-    }
-    save_atomic(agy_path, data)
-    print(f"Wired Antigravity hooks: {agy_path}")
-PY
+"$PY_BIN" "$REPO_DIR/hooks/wire_hooks.py" install "$REPO_DIR/hooks/hook.sh"
 
 echo ""
 echo "Agent Focus installed and running at http://127.0.0.1:7842"
 echo "Try: agent-focus demo"
 echo "Sign in to AnkiWeb for flashcards: agent-focus anki login"
+echo "Using Chrome, Arc, Brave, Edge, or Firefox? Load the extension in $REPO_DIR/extension (README: Browser support)."

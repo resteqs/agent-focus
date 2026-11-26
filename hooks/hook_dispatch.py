@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Forward an agent's start/stop hook to the local Agent Focus daemon.
 
-Usage: hook_dispatch.py <agent> <start|stop> <port> <parent-pid>, hook JSON on stdin.
+Usage, hook JSON on stdin:
+    hook_dispatch.py <agent> <start|stop> <port> <parent-pid>   (from hook.sh, which already answered the agent)
+    hook_dispatch.py <agent> <start|stop>                       (direct, e.g. on Windows: answers the agent itself)
 """
 
 from __future__ import annotations
@@ -16,8 +18,18 @@ from typing import Any, Mapping
 AGENT_PROCESS_NAMES = ("claude", "codex", "agy", "node", "orca-provider")
 
 
+def hook_reply(agent: str, action: str) -> str:
+    """What the agent expects on stdout. Antigravity's stop hook wants an explicit empty decision."""
+    return '{"decision":""}' if agent == "antigravity" and action == "stop" else "{}"
+
+
 def find_agent_pid(start_pid: int) -> int:
-    """Walk up to 8 parents from the hook's shell to the long-lived agent process."""
+    """Walk up to 8 parents from the hook's shell to the long-lived agent process.
+
+    Uses `ps`, so it finds nothing on Windows; sessions there end on stop hooks or the TTL.
+    """
+    if os.name == "nt":
+        return 0
     pid = start_pid
     for _ in range(8):
         if pid <= 1:
@@ -74,10 +86,17 @@ def build_body(
 
 
 def main() -> None:
-    if len(sys.argv) < 5:
+    if len(sys.argv) < 3:
         return
-    agent, action, port, start_ppid = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
-    data = parse_payload(sys.stdin.read())
+    agent, action = sys.argv[1], sys.argv[2]
+    direct = len(sys.argv) < 5
+    port_arg = sys.argv[3] if not direct else os.environ.get("AGENT_FOCUS_PORT", "7842")
+    port = int(port_arg) if port_arg.isdigit() else 7842
+    start_ppid = sys.argv[4] if not direct else str(os.getppid())
+    raw = sys.stdin.read() if sys.stdin is not None else ""
+    if direct:
+        print(hook_reply(agent, action), flush=True)
+    data = parse_payload(raw)
     agent_pid = find_agent_pid(int(start_ppid) if start_ppid.isdigit() else 0)
     body = build_body(agent, data, agent_pid, os.environ, os.getcwd())
 
