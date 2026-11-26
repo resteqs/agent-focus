@@ -7,9 +7,24 @@ BIN_DIR="$HOME/.local/bin"
 PLIST_PATH="$HOME/Library/LaunchAgents/com.agent-focus.daemon.plist"
 LEGACY_PLIST="$HOME/Library/LaunchAgents/com.antoni.agent-focus.plist"
 PY_BIN="$(command -v python3 || echo /opt/homebrew/bin/python3)"
+VENV_DIR="$DATA_DIR/venv"
 
 mkdir -p "$DATA_DIR" "$BIN_DIR" "$HOME/Library/LaunchAgents"
 chmod +x "$REPO_DIR/server.py" "$REPO_DIR/hooks/hook.sh" "$REPO_DIR/hooks/hook_dispatch.py" "$REPO_DIR/bin/agent-focus"
+
+# Set up lightweight venv with official headless `anki` package unless disabled
+if [ "${AGENT_FOCUS_NO_VENV:-0}" != "1" ]; then
+  if command -v uv >/dev/null 2>&1; then
+    (uv venv --python 3.12 "$VENV_DIR" 2>/dev/null || uv venv "$VENV_DIR") && \
+      uv pip install --python "$VENV_DIR/bin/python3" -r "$REPO_DIR/requirements.txt" || true
+  elif [ ! -x "$VENV_DIR/bin/python3" ]; then
+    "$PY_BIN" -m venv "$VENV_DIR" 2>/dev/null && \
+      "$VENV_DIR/bin/pip" install --quiet -r "$REPO_DIR/requirements.txt" || true
+  fi
+  if [ -x "$VENV_DIR/bin/python3" ]; then
+    PY_BIN="$VENV_DIR/bin/python3"
+  fi
+fi
 
 # Seed default config on first install (never overwrites existing config)
 if [ ! -f "$DATA_DIR/config.json" ]; then

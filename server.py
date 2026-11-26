@@ -31,6 +31,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from ankistore import ANKI_AVAILABLE, AnkiStore, FullSyncConflict, SyncError
+
 APP_DIR = Path(__file__).resolve().parent
 STATIC_DIR = APP_DIR / "static"
 DATA_DIR = Path(
@@ -52,6 +54,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "completion_chime": True,
     "obsidian_note_path": "",
     "anki_profile_dir": str(Path.home() / "Library/Application Support/Anki2/User 1"),
+    "anki_headless_home": str(Path.home() / ".local/share/anki-headless"),
+    "anki_headless_profile": "agent-focus",
+    "anki_sync_endpoint": "",
     "blocked_domains": [
         "mail.proton.me",
         "reddit.com",
@@ -137,6 +142,11 @@ class FocusState:
         self.anki_progress: dict[str, Any] = self._load_anki_progress()
         self._anki_sync_timer: threading.Timer | None = None
         self._anki_dirty: bool = False
+        self.anki_store = AnkiStore(
+            home=str(self.config.get("anki_headless_home") or "~/.local/share/anki-headless"),
+            endpoint=str(self.config.get("anki_sync_endpoint") or "").strip() or None,
+            profile=str(self.config.get("anki_headless_profile") or "agent-focus"),
+        )
 
     def _load_config(self) -> dict[str, Any]:
         cfg = dict(DEFAULT_CONFIG)
@@ -239,6 +249,12 @@ class FocusState:
             if self.intercept_started:
                 self.intercept_started.clear()
                 changed = True
+            if self._anki_dirty and self.anki_store.is_authenticated():
+                threading.Thread(
+                    target=self.flush_anki_sync,
+                    kwargs={"only_if_dirty": True, "media": False},
+                    daemon=True,
+                ).start()
 
         today = datetime.now().strftime("%Y-%m-%d")
         if self.intercept_day != today:
@@ -435,6 +451,8 @@ class FocusState:
                     "blocked_domains": list(self.config.get("blocked_domains", [])),
                     "obsidian_configured": bool(str(self.config.get("obsidian_note_path") or "").strip()),
                     "obsidian_label": self._short_obsidian_label(),
+                    "anki_headless_available": ANKI_AVAILABLE,
+                    "anki_headless_signed_in": self.anki_store.is_authenticated(),
                 },
             }
 
@@ -478,21 +496,105 @@ class FocusState:
 
         return re.sub(r"\{\{c(\d+)::([^:}]+)(?:::([^}]+))?\}\}", repl, text)
 
-    def flush_anki_sync(self, only_if_dirty: bool = True) -> bool:
+    def anki_account_status(self) -> dict[str, Any]:
+        info = self.anki_store.auth_info()
+        if info.get("signed_in"):
+            mode = "headless"
+        else:
+            mode = "offline"
+            try:
+                if ankiconnect("version", timeout=0.35):
+                    mode = "ankiconnect"
+            except Exception:
+                pass
+        return {
+            **info,
+            "mode": mode,
+            "endpoint_label": info.get("endpoint") or "AnkiWeb",
+        }
+
+    def login_anki(self, email: str, password: str, endpoint: str | None = None) -> dict[str, Any]:
+        if not ANKI_AVAILABLE:
+            raise RuntimeError("Headless Anki package is not installed in this Python environment.")
+        ep = (endpoint or "").strip() or None
+        self.anki_store.login(email, password, endpoint=ep)
+        # Always pull before any local write on a fresh cache to avoid FULL_SYNC conflicts
+        sync_res = self.anki_store.sync(media=True, on_conflict="download")
         with self.lock:
-            if only_if_dirty and not self._anki_dirty:
-                return True
+            self._anki_dirty = False
+            self.config["anki_sync_endpoint"] = ep or ""
+            self.save_config()
+        self.broadcast("state")
+        return {"ok": True, "account": self.anki_account_status(), "sync": sync_res}
+
+    def logout_anki(self) -> dict[str, Any]:
+        with self.lock:
             if self._anki_sync_timer:
                 self._anki_sync_timer.cancel()
                 self._anki_sync_timer = None
             self._anki_dirty = False
+        self.anki_store.logout()
+        self.broadcast("state")
+        return {"ok": True, "account": self.anki_account_status()}
+
+    def flush_anki_sync(
+        self,
+        only_if_dirty: bool = True,
+        media: bool = True,
+        on_conflict: str = "raise",
+    ) -> tuple[bool, dict[str, Any]]:
+        with self.lock:
+            if only_if_dirty and not self._anki_dirty:
+                return True, {"skipped": True}
+            if self._anki_sync_timer:
+                self._anki_sync_timer.cancel()
+                self._anki_sync_timer = None
+            self._anki_dirty = False
+
+        # Priority 1: Silent headless AnkiStore sync (zero GUI popups)
+        if self.anki_store.is_authenticated():
+            try:
+                res = self.anki_store.sync(media=media, on_conflict=on_conflict)
+                log(f"Headless Anki sync complete: {res.get('required')}")
+                return True, {"mode": "headless", **res}
+            except FullSyncConflict as e:
+                log(f"Headless Anki full-sync conflict: {e}")
+                return False, {"error": str(e), "conflict": True, "mode": "headless"}
+            except SyncError as e:
+                log(f"Headless Anki sync error: {e}")
+                return False, {"error": str(e), "auth_error": "incorrect" in str(e).lower(), "mode": "headless"}
+            except Exception as e:
+                log(f"Headless Anki sync failed: {e}")
+                return False, {"error": str(e), "mode": "headless"}
+
+        # Never trigger AnkiConnect's popup-inducing mw.onSync() automatically
+        if only_if_dirty:
+            return True, {"skipped": True}
+
         try:
             ankiconnect("sync", timeout=10.0)
             log("AnkiConnect AnkiWeb sync complete.")
-            return True
+            return True, {"mode": "ankiconnect"}
         except Exception as e:
             log(f"AnkiConnect sync skipped: {e}")
-            return False
+            return False, {"error": str(e), "mode": "ankiconnect"}
+
+    def _schedule_headless_sync(self) -> None:
+        if not self.anki_store.is_authenticated():
+            return
+        with self.lock:
+            self._anki_dirty = True
+            if self._anki_sync_timer:
+                self._anki_sync_timer.cancel()
+            # Gentle >=60s debounce; silent in-process rslib sync (zero GUI popups)
+            t = threading.Timer(
+                65.0,
+                self.flush_anki_sync,
+                kwargs={"only_if_dirty": True, "media": False},
+            )
+            t.daemon = True
+            t.start()
+            self._anki_sync_timer = t
 
     def _schedule_ankiconnect_sync(self) -> None:
         # Reviews are already committed immediately to Anki Desktop via answerCards.
@@ -743,11 +845,26 @@ class FocusState:
         with self.lock:
             stats = self._study_stats_locked()
 
+        # Priority 1: Direct headless AnkiStore (no Anki Desktop needed)
+        if self.anki_store.is_authenticated() and self.anki_store.col_path.exists():
+            try:
+                payload = self.anki_store.get_cards_payload(deck_filter, study_mode)
+                for c in payload.get("cards", []):
+                    c["front"] = self._rewrite_media_urls(c["front"])
+                    c["back"] = self._rewrite_media_urls(c["back"])
+                payload.update(stats)
+                return payload
+            except Exception as e:
+                log(f"Headless Anki query failed, falling back: {e}")
+
+        # Priority 2: Local AnkiConnect (optional fallback)
         live = self._get_anki_via_connect(deck_filter, study_mode)
         if live is not None:
+            live["anki_mode"] = "ankiconnect"
             live.update(stats)
             return live
 
+        # Priority 3: Read-only offline SQLite snapshot
         decks, cards = self._load_anki_snapshot()
         with self.lock:
             reviewed_today = int(self.anki_progress.get("reviewed_today", 0))
@@ -759,6 +876,7 @@ class FocusState:
         return {
             "source": "offline",
             "ankiconnect": False,
+            "anki_mode": "offline",
             "study_mode": study_mode,
             "decks": decks,
             "total_cards": len(cards),
@@ -777,6 +895,24 @@ class FocusState:
         with self.lock:
             xp_stats = self._award_study_xp_locked(ease)
 
+        # Priority 1: Direct headless AnkiStore (exact FSRS/SM-2 + silent debounced sync)
+        if self.anki_store.is_authenticated() and self.anki_store.col_path.exists():
+            try:
+                with self.anki_store.session() as col:
+                    AnkiStore.answer(col, int(card_id), ease_int)
+                    reviewed_today = AnkiStore.reviewed_today(col)
+                self._schedule_headless_sync()
+                return {
+                    "ok": True,
+                    "synced": True,
+                    "source": "headless",
+                    "reviewed_today": reviewed_today,
+                    **xp_stats,
+                }
+            except Exception as e:
+                log(f"Headless Anki answer failed, falling back: {e}")
+
+        # Priority 2: Local AnkiConnect fallback
         try:
             res = ankiconnect("answerCards", {"answers": [{"cardId": int(card_id), "ease": ease_int}]}, timeout=2.5)
             ok = isinstance(res, list) and bool(res[0])
@@ -990,6 +1126,10 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._send_json({"text": text})
             return
 
+        if path == "/api/anki/account":
+            self._send_json(STATE.anki_account_status())
+            return
+
         if path == "/api/anki/cards":
             deck = (qs.get("deck") or ["ALL"])[0]
             mode = (qs.get("mode") or ["due"])[0]
@@ -1002,7 +1142,8 @@ class RequestHandler(BaseHTTPRequestHandler):
             if not safe_name or safe_name != raw_name or ".." in safe_name:
                 self.send_error(HTTPStatus.BAD_REQUEST)
                 return
-            media_path = STATE._anki_media_dir() / safe_name
+            headless_media = STATE.anki_store.media_dir / safe_name
+            media_path = headless_media if headless_media.exists() else (STATE._anki_media_dir() / safe_name)
             self._serve_file(media_path)
             return
 
@@ -1129,14 +1270,39 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._send_json(STATE.record_anki_review(card_id, ease))
             return
 
+        if path == "/api/anki/login":
+            email = str(body.get("email") or "").strip()
+            password = str(body.get("password") or "")
+            endpoint = str(body.get("endpoint") or "").strip() or None
+            if not email or not password:
+                self._send_json({"ok": False, "error": "Email and password are required"}, status=400)
+                return
+            try:
+                res = STATE.login_anki(email, password, endpoint=endpoint)
+                self._send_json(res)
+            except SyncError as e:
+                self._send_json({"ok": False, "error": str(e)}, status=401)
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, status=500)
+            return
+
+        if path == "/api/anki/logout":
+            self._send_json(STATE.logout_anki())
+            return
+
         if path == "/api/anki/sync":
             qs = urllib.parse.parse_qs(parsed.query)
             auto_only = (qs.get("auto") or ["0"])[0] == "1"
-            ok = STATE.flush_anki_sync(only_if_dirty=auto_only)
+            on_conflict = str(body.get("on_conflict") or "raise")
+            if on_conflict not in ("raise", "download", "upload"):
+                on_conflict = "raise"
+            media = bool(body.get("media", not auto_only))
+            ok, info = STATE.flush_anki_sync(only_if_dirty=auto_only, media=media, on_conflict=on_conflict)
             if ok:
-                self._send_json({"ok": True})
+                self._send_json({"ok": True, **info})
             else:
-                self._send_json({"ok": False, "error": "AnkiConnect sync failed"}, status=503)
+                status = 409 if info.get("conflict") else (401 if info.get("auth_error") else 503)
+                self._send_json({"ok": False, **info}, status=status)
             return
 
         if path == "/api/focus-app":
@@ -1225,6 +1391,8 @@ def main() -> None:
         server.serve_forever()
     finally:
         watcher.stop_event.set()
+        if STATE._anki_dirty and STATE.anki_store.is_authenticated():
+            STATE.flush_anki_sync(only_if_dirty=True, media=False)
         server.server_close()
 
 

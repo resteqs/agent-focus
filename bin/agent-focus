@@ -6,7 +6,12 @@ BASE="http://127.0.0.1:${PORT}"
 DATA_DIR="${AGENT_FOCUS_DATA_DIR:-$HOME/.local/share/agent-focus}"
 PLIST="$HOME/Library/LaunchAgents/com.agent-focus.daemon.plist"
 LEGACY_PLIST="$HOME/Library/LaunchAgents/com.antoni.agent-focus.plist"
-PY_BIN="$(command -v python3 2>/dev/null || echo /opt/homebrew/bin/python3)"
+VENV_PY="$DATA_DIR/venv/bin/python3"
+if [ -x "$VENV_PY" ]; then
+  PY_BIN="$VENV_PY"
+else
+  PY_BIN="$(command -v python3 2>/dev/null || echo /opt/homebrew/bin/python3)"
+fi
 
 case "${1:-status}" in
   status)
@@ -31,6 +36,48 @@ case "${1:-status}" in
     ;;
   open)
     open "$BASE"
+    ;;
+  anki)
+    SUB="${2:-status}"
+    shift 2 2>/dev/null || true
+    case "$SUB" in
+      status)
+        curl -s "$BASE/api/anki/account" | "$PY_BIN" -m json.tool 2>/dev/null || echo "Agent Focus daemon is not running."
+        ;;
+      login)
+        ENDPOINT=""
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            --endpoint) ENDPOINT="$2"; shift 2 ;;
+            *) shift ;;
+          esac
+        done
+        "$PY_BIN" - "$BASE" "$ENDPOINT" <<'PY'
+import getpass, json, sys, urllib.error, urllib.request
+base, endpoint = sys.argv[1], sys.argv[2]
+email = input("AnkiWeb email (or username): ").strip()
+password = getpass.getpass("Password (never saved to disk): ")
+payload = json.dumps({"email": email, "password": password, "endpoint": endpoint}).encode("utf-8")
+req = urllib.request.Request(f"{base}/api/anki/login", data=payload, headers={"Content-Type": "application/json"}, method="POST")
+try:
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        print("Signed in and synced:", json.dumps(data, indent=2))
+except urllib.error.HTTPError as e:
+    print("Login failed:", e.read().decode("utf-8", errors="ignore"), file=sys.stderr)
+    sys.exit(1)
+PY
+        ;;
+      sync)
+        curl -s -X POST -H "Content-Type: application/json" -d '{}' "$BASE/api/anki/sync" | "$PY_BIN" -m json.tool
+        ;;
+      logout)
+        curl -s -X POST "$BASE/api/anki/logout" | "$PY_BIN" -m json.tool
+        ;;
+      *)
+        echo "Usage: agent-focus anki [status|login [--endpoint URL]|sync|logout]"
+        ;;
+    esac
     ;;
   demo)
     SECS="${2:-35}"
@@ -62,6 +109,6 @@ case "${1:-status}" in
     tail -n 40 "$DATA_DIR/server.log" 2>/dev/null || echo "No logs yet."
     ;;
   *)
-    echo "Usage: agent-focus [status|demo [secs]|on|off|clear|pause [mins]|resume|open|restart|logs]"
+    echo "Usage: agent-focus [status|anki [status|login|sync|logout]|demo [secs]|on|off|clear|pause [mins]|resume|open|restart|logs]"
     ;;
 esac

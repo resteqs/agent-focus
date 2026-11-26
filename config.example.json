@@ -9,6 +9,7 @@
   "completion_chime": true,
   "obsidian_note_path": "",
   "anki_profile_dir": "~/Library/Application Support/Anki2/User 1",
+  "anki_sync_endpoint": "",
   "blocked_domains": [
     "mail.proton.me",
     "reddit.com",

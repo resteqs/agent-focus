@@ -1,0 +1,2 @@
+# Optional: enables direct headless AnkiWeb / self-hosted sync without Anki Desktop.
+anki>=26.9

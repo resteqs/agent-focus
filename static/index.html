@@ -1642,6 +1642,111 @@
       font-size: 16px;
     }
 
+    /* Direct AnkiWeb / Custom Sync Server Card in Settings */
+    .anki-account-card {
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: var(--paper-2);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .anki-account-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .anki-account-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: var(--text-sm);
+      font-weight: var(--weight-medium);
+      color: var(--ink-12);
+    }
+
+    .anki-account-fields {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    @media (max-width: 600px) {
+      .anki-account-fields {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .anki-field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .anki-field label {
+      font-size: var(--text-xs);
+      font-weight: var(--weight-medium);
+      color: var(--ink-11);
+    }
+
+    .anki-input {
+      width: 100%;
+      min-height: 44px;
+      padding: 0 12px;
+      border-radius: 9px;
+      border: var(--hairline) solid var(--ink-line-strong);
+      background: var(--paper-raised);
+      color: var(--ink-12);
+      font-size: 16px;
+    }
+
+    .anki-advanced {
+      font-size: var(--text-xs);
+      color: var(--ink-11);
+    }
+
+    .anki-advanced summary {
+      cursor: pointer;
+      user-select: none;
+      padding: 4px 0;
+      color: var(--ink-11);
+    }
+
+    .anki-advanced[open] summary {
+      margin-bottom: 8px;
+    }
+
+    .anki-account-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .anki-account-note {
+      font-size: var(--text-xs);
+      color: var(--ink-11);
+      line-height: 1.45;
+      margin: 0;
+    }
+
+    .anki-account-status {
+      font-size: var(--text-xs);
+      color: var(--ink-11);
+      min-height: 18px;
+    }
+
+    .anki-account-status.ok {
+      color: var(--ok);
+    }
+
+    .anki-account-status.error {
+      color: var(--danger);
+    }
+
     .domain-chips {
       display: flex;
       flex-wrap: wrap;
@@ -2135,6 +2240,54 @@
         <section id="panel-settings" class="panel" role="tabpanel" aria-labelledby="tab-settings">
           <div class="section-head">
             <h2 class="section-title">Settings</h2>
+          </div>
+
+          <div class="spec-group" id="ankiSyncSettings">
+            <h3 class="spec-group-title">Anki sync</h3>
+            <div class="anki-account-card">
+              <div class="anki-account-head">
+                <div>
+                  <div class="anki-account-badge">
+                    <span id="ankiAccountDot" class="sync-dot" aria-hidden="true"></span>
+                    <span id="ankiAccountTitle">Not connected</span>
+                  </div>
+                  <div id="ankiAccountDesc" class="spec-row-desc" style="margin-top:3px;">Sync directly with AnkiWeb without Anki Desktop.</div>
+                </div>
+              </div>
+
+              <form id="ankiLoginForm" class="hidden" style="display:flex;flex-direction:column;gap:12px;">
+                <div class="anki-account-fields">
+                  <div class="anki-field">
+                    <label for="ankiEmailInput">AnkiWeb email</label>
+                    <input id="ankiEmailInput" type="text" class="anki-input" autocomplete="username" placeholder="you@example.com" required />
+                  </div>
+                  <div class="anki-field">
+                    <label for="ankiPasswordInput">Password</label>
+                    <input id="ankiPasswordInput" type="password" class="anki-input" autocomplete="current-password" placeholder="••••••••" required />
+                  </div>
+                </div>
+
+                <details class="anki-advanced">
+                  <summary>Custom sync server (optional)</summary>
+                  <div class="anki-field">
+                    <label for="ankiEndpointInput">Sync server URL</label>
+                    <input id="ankiEndpointInput" type="url" class="anki-input" placeholder="Leave blank for AnkiWeb, or https://sync.example.com/" />
+                  </div>
+                </details>
+
+                <div class="anki-account-actions">
+                  <button id="ankiLoginBtn" type="submit" class="btn btn-amber">Sign in &amp; sync</button>
+                </div>
+                <p class="anki-account-note">Password is used once to obtain a sync token and is never saved to disk. Uses an isolated local cache so Anki Desktop stays untouched.</p>
+              </form>
+
+              <div id="ankiSignedInActions" class="anki-account-actions hidden">
+                <button id="ankiSettingsSyncBtn" type="button" class="btn">Sync now</button>
+                <button id="ankiLogoutBtn" type="button" class="btn btn-ghost">Sign out</button>
+              </div>
+
+              <div id="ankiAccountMsg" class="anki-account-status hidden" role="status" aria-live="polite"></div>
+            </div>
           </div>
 
           <div class="spec-group">
@@ -2995,7 +3148,13 @@
 
         const isLive = Boolean(ankiData.ankiconnect);
         $("ankiSyncDot").classList.toggle("live", isLive);
-        const tip = isLive ? "Anki connected" : "Anki not connected";
+        let tip = "Anki not connected";
+        if (ankiData.anki_mode === "headless") {
+          const ep = ankiData.anki_endpoint || "AnkiWeb";
+          tip = `${ep} connected`;
+        } else if (isLive) {
+          tip = "Anki Desktop connected";
+        }
         $("ankiSyncTooltip").textContent = tip;
         $("ankiDotWrap").setAttribute("aria-label", tip);
         sessionStreak = Number(ankiData.combo || 0);
@@ -3111,11 +3270,17 @@
           $("emptyPrimaryBtn").onclick = loadAnki;
           $("emptySecondaryBtn").classList.add("hidden");
         } else if (!isLive) {
-          $("ankiEmptyTitle").textContent = "Anki is closed";
-          $("ankiEmptyDesc").textContent = "Open Anki to study. Reviews save to your collection.";
-          $("emptyPrimaryBtn").textContent = "Open Anki";
-          $("emptyPrimaryBtn").onclick = launchAnki;
-          $("emptySecondaryBtn").classList.add("hidden");
+          $("ankiEmptyTitle").textContent = "Connect Anki";
+          $("ankiEmptyDesc").textContent = "Sign in to AnkiWeb for silent direct sync, or use Anki Desktop.";
+          $("emptyPrimaryBtn").textContent = "Connect AnkiWeb";
+          $("emptyPrimaryBtn").onclick = () => {
+            SFX.tick();
+            setActiveTab("settings", false, true);
+            setTimeout(() => $("ankiEmailInput")?.focus(), 80);
+          };
+          $("emptySecondaryBtn").textContent = "Open Anki Desktop";
+          $("emptySecondaryBtn").classList.remove("hidden");
+          $("emptySecondaryBtn").onclick = launchAnki;
         } else if (total > 0 && ankiStudyMode !== "all") {
           $("ankiEmptyTitle").textContent = "Nothing due";
           $("ankiEmptyDesc").textContent = "Sync to pull phone reviews, or study all cards.";
@@ -3227,6 +3392,132 @@
     }
 
     let ankiHasPendingSync = false;
+
+    function flushHeadlessSyncBeacon() {
+      if (!ankiHasPendingSync || ankiData?.anki_mode !== "headless") return;
+      ankiHasPendingSync = false;
+      try {
+        navigator.sendBeacon("/api/anki/sync?auto=1");
+      } catch (_) {}
+    }
+
+    window.addEventListener("pagehide", flushHeadlessSyncBeacon);
+
+    function setAnkiAccountMsg(text, kind = "") {
+      const el = $("ankiAccountMsg");
+      if (!text) {
+        el.textContent = "";
+        el.className = "anki-account-status hidden";
+        return;
+      }
+      el.textContent = text;
+      el.className = `anki-account-status${kind ? " " + kind : ""}`;
+    }
+
+    async function loadAnkiAccount() {
+      try {
+        const res = await fetch("/api/anki/account");
+        if (!res.ok) return;
+        const info = await res.json();
+        const dot = $("ankiAccountDot");
+        const title = $("ankiAccountTitle");
+        const desc = $("ankiAccountDesc");
+        const form = $("ankiLoginForm");
+        const actions = $("ankiSignedInActions");
+
+        if (info.signed_in) {
+          dot.classList.add("live");
+          const epLabel = info.endpoint_label || "AnkiWeb";
+          title.textContent = info.account ? `${info.account} · ${epLabel}` : `Signed in · ${epLabel}`;
+          desc.textContent = "Silent background sync active. No Anki Desktop required.";
+          form.classList.add("hidden");
+          actions.classList.remove("hidden");
+        } else if (!info.available) {
+          dot.classList.toggle("live", info.mode === "ankiconnect");
+          title.textContent = info.mode === "ankiconnect" ? "Using Anki Desktop (AnkiConnect)" : "Direct sync package not installed";
+          desc.textContent = "Run ./install.sh (or pip install anki) to enable direct AnkiWeb sync.";
+          form.classList.add("hidden");
+          actions.classList.add("hidden");
+        } else {
+          dot.classList.toggle("live", info.mode === "ankiconnect");
+          title.textContent = info.mode === "ankiconnect" ? "Using Anki Desktop (AnkiConnect)" : "Not signed in";
+          desc.textContent = "Sign in to sync directly with AnkiWeb or a self-hosted sync server — zero popups, no Anki Desktop needed.";
+          form.classList.remove("hidden");
+          actions.classList.add("hidden");
+        }
+      } catch (_) {}
+    }
+
+    $("ankiLoginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = $("ankiEmailInput").value.trim();
+      const password = $("ankiPasswordInput").value;
+      const endpoint = $("ankiEndpointInput").value.trim();
+      if (!email || !password) return;
+
+      const btn = $("ankiLoginBtn");
+      btn.disabled = true;
+      btn.textContent = "Signing in & syncing…";
+      setAnkiAccountMsg("Authenticating and downloading your collection…");
+      try {
+        const res = await fetch("/api/anki/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, endpoint }),
+        });
+        $("ankiPasswordInput").value = "";
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+          SFX.confirm();
+          setAnkiAccountMsg("Signed in and synced.", "ok");
+          await loadAnkiAccount();
+          await loadAnki();
+        } else {
+          setAnkiAccountMsg(data.error || "Sign-in failed. Check credentials and try again.", "error");
+        }
+      } catch (err) {
+        $("ankiPasswordInput").value = "";
+        setAnkiAccountMsg("Could not reach Agent Focus daemon.", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Sign in & sync";
+      }
+    });
+
+    $("ankiSettingsSyncBtn").addEventListener("click", async () => {
+      const btn = $("ankiSettingsSyncBtn");
+      btn.disabled = true;
+      btn.textContent = "Syncing…";
+      setAnkiAccountMsg("Syncing collection…");
+      try {
+        const res = await fetch("/api/anki/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ media: true }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+          SFX.confirm();
+          setAnkiAccountMsg("Sync complete.", "ok");
+          await loadAnki();
+        } else {
+          setAnkiAccountMsg(data.error || "Sync failed.", "error");
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Sync now";
+      }
+    });
+
+    $("ankiLogoutBtn").addEventListener("click", async () => {
+      SFX.tick();
+      await fetch("/api/anki/logout", { method: "POST" });
+      setAnkiAccountMsg("Signed out. Local sync token removed.");
+      await loadAnkiAccount();
+      await loadAnki();
+    });
+
+    loadAnkiAccount();
 
     async function rateAnki(ease, moveFocus = false, triggerBtn = null) {
       if (!ankiCards.length || !ankiRevealed) return;
