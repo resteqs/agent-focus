@@ -231,8 +231,8 @@ class WireHooksTest(unittest.TestCase):
         self.assertEqual((agy["keep"], agy["agent-focus"]["Stop"][0]["command"]), (1, "/new/agent-focus/hooks/hook.sh antigravity stop"))
 
     def test_windows_prefix_is_quoted_with_forward_slashes(self):
-        prefix = wire_hooks.direct_prefix(r"C:\Users\A B\AppData\Local\agent-focus\venv\Scripts\python.exe", r"C:\src\focus\hooks\hook_dispatch.py")
-        self.assertEqual(prefix, '"C:/Users/A B/AppData/Local/agent-focus/venv/Scripts/python.exe" "C:/src/focus/hooks/hook_dispatch.py"')
+        prefix = wire_hooks.direct_prefix(r"D:\Home\A B\AppData\Local\agent-focus\venv\Scripts\python.exe", r"C:\src\focus\hooks\hook_dispatch.py")
+        self.assertEqual(prefix, '"D:/Home/A B/AppData/Local/agent-focus/venv/Scripts/python.exe" "C:/src/focus/hooks/hook_dispatch.py"')
         wire_hooks.install(prefix, self.home)
         wire_hooks.install(prefix.replace("focus", "moved"), self.home)  # a moved checkout repoints, it doesn't duplicate
         self.assertEqual(len(self.commands(".codex/hooks.json")), 3)

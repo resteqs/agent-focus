@@ -56,9 +56,22 @@ class MarkupTest(unittest.TestCase):
         self.assertIn("const FAST_SYNC = { media: false, background_media: true };", script)
         self.assertIn('{ ...FAST_SYNC, on_conflict: "download" }', script)
         self.assertIsNone(re.search(r"[{,]\s*media: true", script))
-        for text in ("Connect AnkiWeb", "Downloading your decks…", "Cards appear first; images finish in the background.",
-                     "Resync connection", "Signing in…", "never stored. Only a local 0600 sync token is saved."):
+        for text in ("Downloading your decks…", "Cards appear first; images finish in the background.",
+                     "Resync connection", "Signing in…"):
             self.assertIn(text, HTML)
+
+    def test_sign_in_card_is_a_minimal_stacked_login(self):
+        card = HTML[HTML.index('<section id="ankiSignInCard"'):HTML.index('<section id="ankiSyncingCard"')]
+        for text in ("Sign in to Anki", "Sync your decks and study while agents work.", 'class="anki-badge"', "<polygon",
+                     '<label for="ankiEmailInput">Email</label>', 'placeholder="you@example.com"',
+                     '<label for="ankiPasswordInput">Password</label>', 'placeholder="Enter your password"',
+                     '<span id="ankiLoginLabel">Sign in</span>'):
+            self.assertIn(text, card)
+        self.assertNotIn("signin-fields", HTML)  # no side-by-side grid
+        self.assertNotIn("signin-note", HTML)  # no disclaimer under the button
+        self.assertEqual(card.count("AnkiWeb"), 0)
+        self.assertLess(card.index('id="ankiEmailInput"'), card.index('id="ankiPasswordInput"'))
+        self.assertLess(card.index('id="ankiPasswordInput"'), card.index('id="ankiLoginBtn"'))
 
     def test_rest_has_a_breath_bar_and_no_numbers(self):
         rest = HTML[HTML.index('id="panel-rest"'):HTML.index('id="panel-settings"')]

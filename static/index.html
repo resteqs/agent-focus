@@ -1590,7 +1590,7 @@
       flex-direction: column;
     }
 
-    /* Same sheet as .linen-sheet: full column width, 14px radius, 28px 30px padding. */
+    /* Same sheet as .linen-sheet: full column width and 14px radius. The login stack centers inside it. */
     .signin-card {
       width: 100%;
       min-height: 256px;
@@ -1602,12 +1602,51 @@
       gap: 22px;
     }
 
+    #ankiSignInCard {
+      padding: 44px 32px 48px;
+    }
+
+    .signin-stack {
+      width: 100%;
+      max-width: 340px;
+      margin: 0 auto;
+    }
+
+    .signin-head {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .anki-badge {
+      width: 44px;
+      height: 44px;
+      margin-bottom: 18px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: color-mix(in oklch, var(--easy) 7%, var(--paper-raised));
+      box-shadow: var(--shadow-control);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .anki-badge svg {
+      width: 24px;
+      height: 24px;
+      fill: color-mix(in oklch, var(--easy) 38%, transparent);
+      stroke: var(--easy);
+      stroke-width: 1.6;
+      stroke-linejoin: round;
+    }
+
     .signin-head h3 {
       margin: 0;
-      font-size: 22px;
-      font-weight: var(--weight-medium);
-      letter-spacing: -0.02em;
-      line-height: 1.25;
+      font-size: 21px;
+      font-weight: var(--weight-semibold);
+      letter-spacing: -0.025em;
+      line-height: 1.2;
       color: var(--ink-12);
       text-wrap: balance;
     }
@@ -1615,20 +1654,16 @@
     .signin-head p {
       margin: 6px 0 0;
       font-size: var(--text-sm);
+      line-height: 1.45;
       color: var(--ink-11);
-      text-wrap: pretty;
+      text-wrap: balance;
     }
 
     .signin-form {
       display: flex;
       flex-direction: column;
-      gap: 18px;
-    }
-
-    .signin-fields {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
       gap: 14px;
+      margin-top: 24px;
     }
 
     .anki-field {
@@ -1639,9 +1674,27 @@
     }
 
     .anki-field label {
-      font-size: var(--text-xs);
+      font-size: 13px;
       font-weight: var(--weight-medium);
       color: var(--ink-11);
+      user-select: none;
+    }
+
+    .signin-form .text-input {
+      height: 44px;
+      transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .signin-form .text-input::placeholder {
+      color: var(--ink-9);
+      opacity: 0.72;
+    }
+
+    /* A warm-neutral ring instead of the global outline: crisp edge, soft halo. */
+    .signin-form .text-input:focus-visible {
+      outline: none;
+      border-color: color-mix(in oklch, var(--ink-12) 55%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in oklch, var(--ink-12) 9%, transparent);
     }
 
     .input-wrap {
@@ -1666,37 +1719,20 @@
       transition: color 150ms ease, background-color 150ms ease;
     }
 
-    .signin-foot {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
-    }
-
-    .signin-note {
-      margin: 0;
-      max-width: 40ch;
-      font-size: var(--text-xs);
-      line-height: 1.5;
-      color: var(--ink-9);
-      text-wrap: pretty;
-    }
-
-    .signin-foot .btn-amber {
-      flex-shrink: 0;
-      min-width: 148px;
+    .signin-form .signin-submit {
+      width: 100%;
+      min-height: 46px;
+      margin-top: 6px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: var(--weight-semibold);
+      letter-spacing: -0.01em;
+      text-transform: none;
     }
 
     @media (max-width: 560px) {
-      .signin-fields {
-        grid-template-columns: 1fr;
-      }
-      .signin-foot {
-        flex-direction: column-reverse;
-        align-items: stretch;
-      }
-      .signin-foot .btn-amber {
-        width: 100%;
+      #ankiSignInCard {
+        padding: 32px 20px 36px;
       }
     }
 
@@ -2183,30 +2219,30 @@
 
           <div id="ankiSignInSlot" class="signin-slot hidden">
             <section id="ankiSignInCard" class="signin-card" aria-labelledby="ankiSignInTitle">
-              <div class="signin-head">
-                <h3 id="ankiSignInTitle">Connect AnkiWeb</h3>
-                <p>Sign in once for silent two-way sync across your devices.</p>
-              </div>
-              <form id="ankiLoginForm" class="signin-form">
-                <div class="signin-fields">
+              <div class="signin-stack">
+                <div class="signin-head">
+                  <span class="anki-badge" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><polygon points="12 3.2 14.65 8.65 20.6 9.45 16.25 13.55 17.35 19.45 12 16.6 6.65 19.45 7.75 13.55 3.4 9.45 9.35 8.65" /></svg>
+                  </span>
+                  <h3 id="ankiSignInTitle">Sign in to Anki</h3>
+                  <p>Sync your decks and study while agents work.</p>
+                </div>
+                <form id="ankiLoginForm" class="signin-form">
                   <div class="anki-field">
-                    <label for="ankiEmailInput">AnkiWeb email</label>
-                    <input id="ankiEmailInput" type="email" class="text-input" autocomplete="username" autocapitalize="off" spellcheck="false" required />
+                    <label for="ankiEmailInput">Email</label>
+                    <input id="ankiEmailInput" type="email" class="text-input" placeholder="you@example.com" autocomplete="username" autocapitalize="off" spellcheck="false" required />
                   </div>
                   <div class="anki-field">
                     <label for="ankiPasswordInput">Password</label>
                     <div class="input-wrap">
-                      <input id="ankiPasswordInput" type="password" class="text-input" autocomplete="current-password" required />
+                      <input id="ankiPasswordInput" type="password" class="text-input" placeholder="Enter your password" autocomplete="current-password" required />
                       <button id="ankiRevealBtn" type="button" class="reveal-btn" aria-pressed="false" aria-label="Show password">Show</button>
                     </div>
                   </div>
-                </div>
-                <div id="ankiLoginMsg" class="anki-account-status hidden" role="status" aria-live="polite"></div>
-                <div class="signin-foot">
-                  <p class="signin-note">Your password is sent once to AnkiWeb and never stored. Only a local 0600 sync token is saved.</p>
-                  <button id="ankiLoginBtn" type="submit" class="btn btn-amber"><span class="spinner" aria-hidden="true"></span><span id="ankiLoginLabel">Sign in</span></button>
-                </div>
-              </form>
+                  <button id="ankiLoginBtn" type="submit" class="btn btn-amber signin-submit"><span class="spinner" aria-hidden="true"></span><span id="ankiLoginLabel">Sign in</span></button>
+                  <div id="ankiLoginMsg" class="anki-account-status hidden" role="status" aria-live="polite"></div>
+                </form>
+              </div>
             </section>
 
             <section id="ankiSyncingCard" class="signin-card syncing-card hidden" data-state="syncing" aria-live="polite" aria-labelledby="ankiSyncingTitle">

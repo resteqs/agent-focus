@@ -207,7 +207,7 @@ Never ask the user for their password in this chat. Give them one of these two o
   start "http://127.0.0.1:7842/?tab=anki"         # Windows
   ```
 
-  Tell the user to enter their AnkiWeb email and password in **Connect AnkiWeb** and click **Sign in**. Cards show up within seconds; images keep downloading in the background. A self-hosted server is set from the terminal (below) or with `anki_sync_endpoint` in `config.json`.
+  Tell the user to enter their AnkiWeb email and password in the **Sign in to Anki** card and click **Sign in**. Cards show up within seconds; images keep downloading in the background. A self-hosted server is set from the terminal (below) or with `anki_sync_endpoint` in `config.json`.
 
 - **Terminal.** Tell the user to run this in their own terminal window, not through you, because it prompts for a password:
 
@@ -236,7 +236,7 @@ agent-focus demo 15
 `agent-focus status` prints JSON from the daemon. `agent-focus demo 15` fakes a 15-second agent run and opens the wait page (in Safari on macOS, in the default browser elsewhere). Ask the user to confirm that:
 
 1. The browser shows the Agent Focus wait page.
-2. The Flashcards tab shows their cards, or a "Connect AnkiWeb" prompt if they skipped Step 5.
+2. The Flashcards tab shows their cards, or a "Sign in to Anki" card if they skipped Step 5.
 3. After about 15 seconds the page says the run is done and offers a button to return to their app.
 
 Then tell the user it is installed, and mention these commands:
