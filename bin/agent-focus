@@ -26,6 +26,7 @@ case "${1:-status}" in
     curl -s -X POST "$BASE/api/agent/clear" >/dev/null && echo "Cleared all active agent sessions."
     ;;
   pause)
+    # Kept for scripts; the web UI no longer offers a global pause.
     MINS="${2:-10}"
     SECS=$((MINS * 60))
     curl -s -X POST -H "Content-Type: application/json" -d "{\"seconds\":$SECS}" "$BASE/api/pause" >/dev/null && echo "Paused blocking for ${MINS} min."
@@ -56,15 +57,30 @@ import getpass, json, sys, urllib.error, urllib.request
 base, endpoint = sys.argv[1], sys.argv[2]
 email = input("AnkiWeb email or sync server username: ").strip()
 password = getpass.getpass("Password (not stored): ")
-payload = json.dumps({"email": email, "password": password, "endpoint": endpoint}).encode("utf-8")
-req = urllib.request.Request(f"{base}/api/anki/login", data=payload, headers={"Content-Type": "application/json"}, method="POST")
-try:
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        account = json.loads(resp.read().decode("utf-8"))["account"]
-    print(f"Signed in as {account['account']} on {account['endpoint_label']}. Collection synced.")
-except urllib.error.HTTPError as e:
+
+
+def post(path, body, timeout):
+    req = urllib.request.Request(f"{base}{path}", data=json.dumps(body).encode("utf-8"),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def fail(prefix, e):
     error = json.loads(e.read().decode("utf-8", errors="replace") or "{}").get("error", e.reason)
-    sys.exit(f"Sign-in failed: {error}")
+    sys.exit(f"{prefix}: {error}")
+
+
+step = "Sign-in failed"
+try:
+    account = post("/api/anki/login", {"email": email, "password": password, "endpoint": endpoint}, 60)["account"]
+    print(f"Signed in as {account['account']} on {account['endpoint_label']}. Downloading your decks...")
+    # Cards first; images keep arriving in the background while the daemon runs.
+    step = "Sync failed"
+    post("/api/anki/sync", {"media": False, "background_media": True, "on_conflict": "download"}, 600)
+    print("Collection synced. Media is syncing in the background.")
+except urllib.error.HTTPError as e:
+    fail(step, e)
 except urllib.error.URLError:
     sys.exit("Agent Focus is not running. Start it with: agent-focus restart")
 PY

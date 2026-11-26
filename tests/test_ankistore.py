@@ -9,6 +9,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -19,7 +20,7 @@ import support
 from ankistore import ANKI_AVAILABLE, AnkiStore, FullSyncConflict, SyncError, is_auth_error
 
 SYNC_PASSWORD = "throwaway-local-password-4711"
-SYNC_USERS = [f"test-user-{i}" for i in range(1, 11)]  # one account per test keeps them independent
+SYNC_USERS = [f"test-user-{i}" for i in range(1, 13)]  # one account per test keeps them independent
 PNG_BYTES = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
     b"\x00\x00\x00\rIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
@@ -172,6 +173,31 @@ class SyncServerTest(unittest.TestCase):
             self.assertTrue(col.get_config("fsrs"))
 
         self.assertEqual(mirror.sync(media=True)["required"], "NO_CHANGES")
+
+    def test_fast_sync_then_background_media(self):
+        seed = self.signed_in_store("fast-seed")
+        seed.sync(media=False, on_conflict="download")
+        with seed.session() as col:
+            image = col.media.write_data("fast-sync.png", PNG_BYTES)
+            col.add_note(self.basic_note(col, "Fast front", f'<img src="{image}">'), col.decks.id("Default"))
+        seed.sync(media=True, on_conflict="upload")
+
+        mirror = self.signed_in_store("fast-mirror")
+        self.assertEqual(mirror.sync(media=False, on_conflict="download")["required"], "FULL_DOWNLOAD")
+        self.assertFalse((mirror.media_dir / image).exists())  # cards first, images later
+        self.assertEqual(mirror.get_cards_payload("ALL", "all")["filtered_count"], 1)
+
+        worker = threading.Thread(target=mirror.sync_media)
+        worker.start()
+        # Reads and a normal sync keep working while media downloads on the shared collection.
+        self.assertEqual(mirror.get_cards_payload("ALL", "all")["filtered_count"], 1)
+        mirror.sync(media=True)
+        worker.join(30)
+        self.assertFalse(worker.is_alive())
+        self.assertFalse(mirror.media_syncing)
+        self.assertEqual((mirror.media_dir / image).read_bytes(), PNG_BYTES)
+        with mirror.session() as col:  # the shared collection was closed and the lock released
+            self.assertEqual(len(col.find_notes("Fast")), 1)
 
     def test_diverged_collections_need_an_explicit_choice(self):
         first = self.signed_in_store("diverge-a")

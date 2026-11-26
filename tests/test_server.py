@@ -243,6 +243,56 @@ class HeadlessSyncFlagTest(unittest.TestCase):
         self.assertEqual((ok, info["mode"]), (True, "headless"))
         self.assertFalse(state._anki_dirty)
 
+    def test_login_only_authenticates(self):
+        state = isolated_state(self)
+        state.config["anki_sync_endpoint"] = "https://sync.example.com/"
+        with mock.patch.object(state.anki_store, "login") as login, \
+                mock.patch.object(state.anki_store, "sync") as sync, \
+                mock.patch.object(state, "broadcast") as broadcast:
+            res = state.login_anki("me@example.com", "pw")
+        login.assert_called_once_with("me@example.com", "pw", endpoint=None)
+        sync.assert_not_called()
+        broadcast.assert_called_once_with("state")
+        self.assertEqual(set(res), {"ok", "account"})
+        self.assertEqual(state.config["anki_sync_endpoint"], "https://sync.example.com/")
+
+    def test_fast_sync_starts_media_in_the_background(self):
+        state = isolated_state(self)
+        release = threading.Event()
+        with mock.patch.object(state.anki_store, "is_authenticated", return_value=True), \
+                mock.patch.object(state.anki_store, "sync", return_value={"required": "FULL_DOWNLOAD"}) as sync, \
+                mock.patch.object(state.anki_store, "sync_media", side_effect=lambda: release.wait(5)) as media, \
+                mock.patch.object(state, "broadcast") as broadcast:
+            ok, info = state.flush_anki_sync(only_if_dirty=False, media=False, on_conflict="download", background_media=True)
+            self.assertTrue(ok)
+            self.assertTrue(info["media_syncing"])
+            self.assertTrue(state.anki_account_status()["media_syncing"])
+            self.assertTrue(state.snapshot()["anki_media_syncing"])
+            self.assertFalse(state.sync_media_background())  # one at a time
+            release.set()
+            state._media_thread.join(5)
+        sync.assert_called_once_with(media=False, on_conflict="download")
+        media.assert_called_once_with()
+        broadcast.assert_called_with("anki_media")
+        self.assertFalse(state.media_syncing)
+
+    def test_failed_background_media_is_logged_and_cleared(self):
+        state = isolated_state(self)
+        with mock.patch.object(state.anki_store, "sync_media", side_effect=OSError("offline")), \
+                mock.patch.object(state, "broadcast"):
+            self.assertTrue(state.sync_media_background())
+            state._media_thread.join(5)
+        self.assertFalse(state.media_syncing)
+        server.log.assert_any_call("Anki media sync failed: offline")
+
+    def test_plain_sync_does_not_start_background_media(self):
+        state = isolated_state(self)
+        with mock.patch.object(state.anki_store, "is_authenticated", return_value=True), \
+                mock.patch.object(state.anki_store, "sync", return_value={"required": "NO_CHANGES"}), \
+                mock.patch.object(state, "sync_media_background") as background:
+            state.flush_anki_sync(only_if_dirty=False, media=True)
+        background.assert_not_called()
+
     def test_headless_review_schedules_debounced_silent_sync(self):
         state = isolated_state(self)
         self.assertGreaterEqual(server.HEADLESS_SYNC_DEBOUNCE_SECONDS, 65)
@@ -285,7 +335,7 @@ class AnkiStatusTest(unittest.TestCase):
                 self.assertEqual((status["mode"], status["endpoint_label"]), (mode, label))
                 self.assertEqual(
                     set(status),
-                    {"available", "signed_in", "endpoint", "account", "profile", "has_collection", "mode", "endpoint_label"},
+                    {"available", "signed_in", "endpoint", "account", "profile", "has_collection", "mode", "endpoint_label", "media_syncing"},
                 )
 
     def test_unavailable_payload(self):
@@ -462,6 +512,45 @@ class HttpApiTest(unittest.TestCase):
 
     def test_login_requires_credentials(self):
         self.assertEqual(self.post("/api/anki/login", {"email": "a@example.com"})[0], 400)
+
+    def test_login_returns_before_any_sync(self):
+        with mock.patch.object(self.state.anki_store, "login") as login, \
+                mock.patch.object(self.state.anki_store, "sync") as sync:
+            status, data = self.post("/api/anki/login", {"email": " me@example.com ", "password": "pw"})
+        self.assertEqual((status, data["ok"]), (200, True))
+        self.assertNotIn("sync", data)
+        login.assert_called_once_with("me@example.com", "pw", endpoint=None)
+        sync.assert_not_called()
+
+    @unittest.skipUnless(server.ANKI_AVAILABLE, "needs the anki package")
+    def test_login_reports_rejected_credentials(self):
+        from anki.errors import SyncErrorKind
+
+        rejected = server.SyncError("bad password", None, None, None, SyncErrorKind.AUTH)
+        with mock.patch.object(self.state.anki_store, "login", side_effect=rejected):
+            status, data = self.post("/api/anki/login", {"email": "me@example.com", "password": "nope"})
+        self.assertEqual((status, data["ok"]), (401, False))
+
+    def test_fast_sync_route_downloads_cards_and_backgrounds_media(self):
+        with mock.patch.object(self.state.anki_store, "is_authenticated", return_value=True), \
+                mock.patch.object(self.state.anki_store, "sync", return_value={"required": "FULL_DOWNLOAD", "server_message": ""}) as sync, \
+                mock.patch.object(self.state, "sync_media_background", return_value=True) as background:
+            status, data = self.post("/api/anki/sync", {"media": False, "background_media": True, "on_conflict": "download"})
+        self.assertEqual((status, data["ok"], data["required"]), (200, True, "FULL_DOWNLOAD"))
+        self.assertIn("media_syncing", data)
+        sync.assert_called_once_with(media=False, on_conflict="download")
+        background.assert_called_once_with()
+
+    def test_failed_sync_flags_auth_errors_for_resync(self):
+        with mock.patch.object(self.state.anki_store, "is_authenticated", return_value=True), \
+                mock.patch.object(self.state.anki_store, "sync", side_effect=OSError("offline")), \
+                mock.patch.object(self.state, "sync_media_background") as background:
+            status, data = self.post("/api/anki/sync", {"media": False, "background_media": True})
+        self.assertEqual((status, data["ok"], data["auth_error"]), (503, False, False))
+        background.assert_not_called()
+
+    def test_account_reports_media_syncing(self):
+        self.assertIs(self.request("GET", "/api/anki/account")[1]["media_syncing"], False)
 
     def test_media_is_served_from_the_headless_collection(self):
         media_dir = self.state.anki_store.media_dir

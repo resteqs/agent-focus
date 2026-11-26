@@ -5,7 +5,8 @@ auth.json holds the sync key and endpoint, never the password, and is created 06
 
     store = AnkiStore(home="~/.local/share/anki-headless", profile="agent-focus")
     store.login(email, password)
-    store.sync(on_conflict="download")
+    store.sync(media=False, on_conflict="download")  # cards first, in seconds
+    store.sync_media()  # images afterwards; other threads keep reading the collection meanwhile
     with store.session() as col:
         card = store.next_card(col)
 """
@@ -16,6 +17,7 @@ import fcntl
 import json
 import os
 import re
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -97,6 +99,10 @@ class AnkiStore:
         self.auth_path = self.home / "auth.json"
         self.lock_path = self.home / ".lock"
         self.endpoint = (endpoint or os.environ.get("ANKI_SYNC_ENDPOINT") or "").strip() or None
+        # Threads in this process take turns on one collection. While sync_media() runs, the
+        # collection stays open and session() hands out that same instance instead of reopening it.
+        self._thread_lock = threading.RLock()
+        self._shared_col: Collection | None = None
 
     # auth
 
@@ -158,6 +164,15 @@ class AnkiStore:
     def session(self) -> Iterator[Collection]:
         """Open the collection under an exclusive cross-process lock (collections are single-writer)."""
         _require_anki()
+        with self._thread_lock:
+            if self._shared_col is not None:
+                yield self._shared_col
+                return
+            with self._open_locked() as col:
+                yield col
+
+    @contextlib.contextmanager
+    def _open_locked(self) -> Iterator[Collection]:
         self.home.mkdir(parents=True, exist_ok=True)
         with open(self.lock_path, "w") as lock_file:
             fcntl.flock(lock_file, fcntl.LOCK_EX)
@@ -170,6 +185,10 @@ class AnkiStore:
                 with contextlib.suppress(Exception):
                     col.close()
 
+    @property
+    def media_syncing(self) -> bool:
+        return self._shared_col is not None
+
     # sync
 
     def sync(self, *, media: bool = True, on_conflict: str = "raise", timeout: float = 600) -> dict[str, Any]:
@@ -177,6 +196,8 @@ class AnkiStore:
         auth = self.auth()
         account = str(self._read_auth().get("account") or "")
         with self.session() as col:
+            if self.media_syncing:
+                media = False  # sync_media() is already pulling files on this collection
             out = col.sync_collection(auth, sync_media=media)
             if out.new_endpoint:
                 auth.endpoint = out.new_endpoint
@@ -208,6 +229,32 @@ class AnkiStore:
                         raise TimeoutError("Media sync timed out")
                     time.sleep(0.1)
             return {"required": required, "server_message": out.server_message}
+
+    def sync_media(self, timeout: float = 1800) -> None:
+        """Media-only sync. The collection stays open (and usable from other threads) until it ends."""
+        auth = self.auth()
+        with self._thread_lock:
+            if self._shared_col is not None:
+                return  # one media sync at a time
+            opener = self._open_locked()  # entered and exited by hand: the lock must not be held in between
+            col = opener.__enter__()
+            self._shared_col = col
+        try:
+            with self._thread_lock:
+                col.sync_media(auth)
+            started = time.time()
+            while True:
+                with self._thread_lock:
+                    if not col.media_sync_status().active:
+                        break
+                    if time.time() - started > timeout:
+                        col.abort_media_sync()
+                        raise TimeoutError("Media sync timed out")
+                time.sleep(0.25)
+        finally:
+            with self._thread_lock:
+                self._shared_col = None
+                opener.__exit__(None, None, None)
 
     # notes
 

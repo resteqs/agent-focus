@@ -170,6 +170,7 @@ class FocusState:
         self.anki_progress = self._load_anki_progress()
         self._anki_sync_timer: threading.Timer | None = None
         self._anki_dirty = False
+        self._media_thread: threading.Thread | None = None
         self.anki_store = AnkiStore(
             home=str(self.config.get("anki_headless_home") or DEFAULT_CONFIG["anki_headless_home"]),
             endpoint=str(self.config.get("anki_sync_endpoint") or "").strip() or None,
@@ -411,6 +412,7 @@ class FocusState:
                     "anki_headless_available": ANKI_AVAILABLE,
                     "anki_headless_signed_in": self.anki_store.is_authenticated(),
                 },
+                "anki_media_syncing": self.media_syncing,
             }
 
     # Anki: the headless AnkiStore (official `anki` package) is the only backend.
@@ -423,18 +425,50 @@ class FocusState:
             mode = "headless"
         else:
             mode = "signed_out"
-        return {**info, "mode": mode, "endpoint_label": info["endpoint"] or "AnkiWeb"}
+        return {
+            **info,
+            "mode": mode,
+            "endpoint_label": info["endpoint"] or "AnkiWeb",
+            "media_syncing": self.media_syncing,
+        }
 
     def login_anki(self, email: str, password: str, endpoint: str | None = None) -> dict[str, Any]:
+        """Authenticate only (about a second). The caller follows up with a fast download sync."""
         self.anki_store.login(email, password, endpoint=endpoint)
-        # Pull before any local write so a fresh cache can't cause a FULL_SYNC conflict.
-        sync_res = self.anki_store.sync(media=True, on_conflict="download")
         with self.lock:
             self._anki_dirty = False
-            self.config["anki_sync_endpoint"] = endpoint or ""
-            self.save_config()
+            if endpoint:  # the web UI never sends one; keep a configured server intact
+                self.config["anki_sync_endpoint"] = endpoint
+                self.save_config()
         self.broadcast("state")
-        return {"ok": True, "account": self.anki_account_status(), "sync": sync_res}
+        return {"ok": True, "account": self.anki_account_status()}
+
+    @property
+    def media_syncing(self) -> bool:
+        thread = self._media_thread
+        return bool(thread and thread.is_alive())
+
+    def sync_media_background(self) -> bool:
+        """Pull media on a daemon thread. Returns False when one is already running."""
+        with self.lock:
+            if self.media_syncing:
+                return False
+            thread = threading.Thread(target=self._run_media_sync, name="anki-media-sync", daemon=True)
+            self._media_thread = thread
+            thread.start()
+        return True
+
+    def _run_media_sync(self) -> None:
+        try:
+            self.anki_store.sync_media()
+            log("Anki media sync complete")
+        except Exception as e:  # network or auth trouble; the next sync retries
+            log(f"Anki media sync failed: {e}")
+        finally:
+            with self.lock:
+                if self._media_thread is threading.current_thread():
+                    self._media_thread = None
+            self.broadcast("anki_media")
 
     def _cancel_sync_timer_locked(self) -> None:
         if self._anki_sync_timer:
@@ -449,7 +483,13 @@ class FocusState:
         self.broadcast("state")
         return {"ok": True, "account": self.anki_account_status()}
 
-    def flush_anki_sync(self, only_if_dirty: bool = True, media: bool = True, on_conflict: str = "raise") -> tuple[bool, dict[str, Any]]:
+    def flush_anki_sync(
+        self,
+        only_if_dirty: bool = True,
+        media: bool = True,
+        on_conflict: str = "raise",
+        background_media: bool = False,
+    ) -> tuple[bool, dict[str, Any]]:
         with self.lock:
             if only_if_dirty and not self._anki_dirty:
                 return True, {"skipped": True}
@@ -471,7 +511,9 @@ class FocusState:
                 "auth_error": is_auth_error(e),
             }
         log(f"Anki sync complete: {res['required']}")
-        return True, {"mode": "headless", **res}
+        if background_media and not media:
+            self.sync_media_background()
+        return True, {"mode": "headless", **res, "media_syncing": self.media_syncing}
 
     def _schedule_headless_sync(self) -> None:
         with self.lock:
@@ -940,7 +982,12 @@ def post_anki_sync(body: dict[str, Any], qs: dict[str, list[str]]) -> tuple[int,
     on_conflict = str(body.get("on_conflict") or "raise")
     if on_conflict not in ("raise", "download", "upload"):
         raise BadRequest("on_conflict must be raise, download, or upload")
-    ok, info = STATE.flush_anki_sync(only_if_dirty=auto_only, media=bool(body.get("media", not auto_only)), on_conflict=on_conflict)
+    ok, info = STATE.flush_anki_sync(
+        only_if_dirty=auto_only,
+        media=bool(body.get("media", not auto_only)),
+        on_conflict=on_conflict,
+        background_media=bool(body.get("background_media", False)),
+    )
     if ok:
         return 200, {"ok": True, **info}
     if info.get("mode") == "signed_out":

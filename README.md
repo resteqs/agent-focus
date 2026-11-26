@@ -46,7 +46,8 @@ No `sudo`, no browser extension, no system proxy.
 
 Agent Focus syncs with AnkiWeb directly, through the official `anki` Python package. Anki Desktop does not need to be installed or open.
 
-- **Sign in once.** In **Settings > Anki sync**, or with `agent-focus anki login`.
+- **Sign in once.** On the **Flashcards** tab, or with `agent-focus anki login`. Sign-in only exchanges your password for a sync key, so it takes about a second.
+- **Cards first, images later.** The first download pulls the collection without media, so cards appear in seconds. Images finish on a background thread while you study.
 - **Silent sync.** Reviews are pushed about a minute after your last rating, and again when your agents finish. No dialogs appear.
 - **Separate local cache.** The synced collection lives in `~/.local/share/anki-headless/agent-focus/`, apart from any Anki Desktop profile.
 - **Password never saved.** Your password is sent to the sync server once, in exchange for a sync key. Only the key, the endpoint, and your username are kept, in `auth.json` with `0600` permissions.
@@ -77,7 +78,6 @@ agent-focus status         # active agent sessions and config
 agent-focus demo [secs]    # fake an agent run (default 35s) and open Safari
 agent-focus open           # open the wait page
 agent-focus on | off       # block sites even with no agent running
-agent-focus pause [mins]   # stop blocking for a while (default 10)
 agent-focus resume
 agent-focus clear          # forget stuck sessions
 agent-focus anki ...       # see Anki sync
@@ -98,7 +98,7 @@ agent-focus logs
 | `return_app` | `Orca` | App the **Return to** button brings forward. |
 | `completion_chime` | `true` | Play a short sound when the last run ends. |
 | `obsidian_note_path` | empty | Markdown file the Notes tab appends to. |
-| `anki_sync_endpoint` | empty | Self-hosted sync server. Empty means AnkiWeb. |
+| `anki_sync_endpoint` | empty | Self-hosted sync server. Empty means AnkiWeb. Also settable with `ANKI_SYNC_ENDPOINT` or `agent-focus anki login --endpoint`. |
 
 ## Running tests
 

@@ -120,13 +120,13 @@ Flashcards sync directly with AnkiWeb, or with a self-hosted Anki sync server. A
 
 Never ask the user for their password in this chat. Give them one of these two options and let them do it:
 
-- **Browser (easiest).** Open the Settings tab for them:
+- **Browser (easiest).** Open the Flashcards tab for them:
 
   ```bash
-  open "http://127.0.0.1:7842/?tab=settings"
+  open "http://127.0.0.1:7842/?tab=anki"
   ```
 
-  Tell the user to enter their AnkiWeb email and password under **Anki sync** and click **Sign in**. For a self-hosted server, they open **Custom sync server** and paste its URL first.
+  Tell the user to enter their AnkiWeb email and password in **Connect AnkiWeb** and click **Sign in**. Cards show up within seconds; images keep downloading in the background. A self-hosted server is set from the terminal (below) or with `anki_sync_endpoint` in `config.json`.
 
 - **Terminal.** Tell the user to run this in their own terminal window, not through you, because it prompts for a password:
 
@@ -160,7 +160,6 @@ agent-focus demo 15
 
 Then tell the user it is installed, and mention these commands:
 
-- `agent-focus pause 30` stops blocking for 30 minutes.
 - `agent-focus open` opens the wait page.
 - `./uninstall.sh` in the checkout removes the LaunchAgent, the CLI link, and the hooks.
 
