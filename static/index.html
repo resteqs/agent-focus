@@ -242,6 +242,17 @@
       border-inline-end: var(--hairline) solid var(--ink-line);
     }
 
+    @media (min-width: 861px) {
+      .stage {
+        position: sticky;
+        top: 0;
+        align-self: start;
+        height: 100dvh;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+      }
+    }
+
     .stage-upper {
       display: flex;
       flex-direction: column;
@@ -345,6 +356,50 @@
 
     .floating-card.restore-card {
       box-shadow: 0 0 0 1.5px color-mix(in oklch, var(--card-ink) 22%, transparent);
+    }
+
+    .floating-card.intercept-card {
+      gap: 12px;
+      background: var(--stage-surface);
+      color: var(--stage-ink);
+      box-shadow: 0 0 0 1px var(--stage-line);
+    }
+
+    .intercept-card .floating-title {
+      font-size: var(--text-sm);
+      color: var(--stage-ink);
+    }
+
+    .intercept-card .floating-sub {
+      color: var(--stage-muted);
+    }
+
+    .intercept-card button:focus-visible {
+      outline-color: var(--stage-focus);
+    }
+
+    .intercept-card .bypass-btn {
+      min-height: 40px;
+      font-size: var(--text-xs);
+    }
+
+    .intercept-card .bypass-btn:disabled {
+      color: var(--stage-muted);
+      box-shadow: 0 0 0 1px var(--stage-line);
+    }
+
+    .intercept-card .bypass-btn.unlocked {
+      background: color-mix(in oklch, var(--stage-ink) 7%, transparent);
+      color: var(--stage-ink);
+      box-shadow: 0 0 0 1px var(--stage-line);
+    }
+
+    .intercept-card .ring-track {
+      stroke: var(--stage-line);
+    }
+
+    .intercept-card .ring-fill {
+      stroke: var(--stage-muted);
     }
 
     .restore-subtle-link {
@@ -677,6 +732,8 @@
       .rate-btn.good:hover  { background: var(--ok-soft); color: var(--ok); box-shadow: 0 0 0 1px color-mix(in oklch, var(--ok) 42%, transparent); }
       .rate-btn.easy:hover  { background: var(--easy-soft); color: var(--easy); box-shadow: 0 0 0 1px color-mix(in oklch, var(--easy) 42%, transparent); }
       .chip-remove:hover { color: var(--danger); background: var(--danger-soft); }
+      .reveal-btn:hover, .dialog-close:hover { color: var(--ink-12); background: var(--paper-2); }
+      .signin-advanced summary:hover { color: var(--ink-12); }
       .seg-btn:hover { color: var(--ink-12); }
     }
 
@@ -1367,142 +1424,60 @@
       gap: 8px;
     }
 
-    .rest-instrument {
-      background: var(--paper-2);
-      border-radius: 16px;
-      padding: 40px 28px 34px;
+    .rest-stage {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 28px;
+      padding: 56px 0 8px;
     }
 
-    .breath-dial {
+    .bloom {
+      --petal: oklch(0.80 0.115 72 / 0.32);
       position: relative;
-      width: 248px;
-      height: 248px;
-      display: grid;
-      place-items: center;
-      user-select: none;
-    }
-
-    .breath-dial-svg {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
+      width: 260px;
+      height: 260px;
       pointer-events: none;
+      will-change: transform;
     }
 
-    .dial-tick {
-      stroke: var(--ink-line-strong);
-      stroke-linecap: round;
-    }
-
-    .dial-tick.major {
-      stroke: color-mix(in oklch, var(--ink-12) 34%, transparent);
-    }
-
-    .dial-track {
-      fill: none;
-      stroke: var(--ink-line);
-      stroke-width: 1.5;
-    }
-
-    .dial-progress {
-      fill: none;
-      stroke: color-mix(in oklch, var(--amber) 58%, transparent);
-      stroke-width: 1.75;
-      stroke-linecap: round;
-      transform: rotate(-90deg);
-      transform-origin: 124px 124px;
-    }
-
-    .breath-bloom {
+    .petal {
       position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 108px;
+      height: 108px;
+      margin: -54px 0 0 -54px;
       border-radius: 50%;
-      pointer-events: none;
-      will-change: transform, opacity;
+      background: var(--petal);
+      mix-blend-mode: multiply;
+      will-change: transform;
     }
 
-    .bloom-outer {
-      width: 158px;
-      height: 158px;
-      background: color-mix(in oklch, var(--amber) 9%, transparent);
-      transform: scale(0.88);
-      opacity: 0.45;
-    }
-
-    .bloom-mid {
-      width: 128px;
-      height: 128px;
-      background: color-mix(in oklch, var(--amber) 14%, transparent);
-      transform: scale(0.90);
-      opacity: 0.58;
-    }
-
-    .bloom-core {
-      width: 96px;
-      height: 96px;
-      background: var(--paper-raised);
-      box-shadow: 0 0 0 1.25px color-mix(in oklch, var(--amber) 48%, transparent);
-      transform: scale(0.95);
-    }
-
-    .breath-readout {
-      position: relative;
-      z-index: 2;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
+    @media (prefers-color-scheme: dark) {
+      .bloom {
+        --petal: oklch(0.76 0.12 70 / 0.24);
+      }
+      .petal {
+        mix-blend-mode: screen;
+      }
     }
 
     .breath-phase-name {
-      font-size: 17px;
+      font-size: var(--text-base);
       font-weight: var(--weight-medium);
-      letter-spacing: -0.015em;
+      letter-spacing: -0.01em;
       color: var(--ink-12);
+      min-height: 1.55em;
     }
 
-    .phase-strip {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .phase-step {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 8px;
+    .rest-note {
+      margin: 0;
       font-size: var(--text-xs);
-      font-weight: var(--weight-medium);
       color: var(--ink-9);
+      text-align: center;
       font-variant-numeric: tabular-nums;
-      transition: background-color 180ms ease, color 180ms ease;
-    }
-
-    .phase-step.active {
-      background: var(--paper-raised);
-      color: var(--ink-12);
-      box-shadow: var(--shadow-control);
-    }
-
-    .rest-footer {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding-top: 14px;
-      border-top: var(--hairline) solid var(--ink-line);
-      font-size: var(--text-xs);
-      color: var(--ink-9);
-      flex-wrap: wrap;
+      text-wrap: balance;
     }
 
     .spec-group {
@@ -1596,63 +1571,196 @@
       flex: 1;
     }
 
-    .anki-account-card {
-      padding: 16px 18px;
-      border-radius: 12px;
-      background: var(--paper-2);
+    .row-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .row-actions .btn {
+      min-height: 36px;
+      padding-inline: 12px;
+      font-size: var(--text-sm);
+    }
+
+    .anki-row-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .anki-row-title span:last-child {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .signin-slot {
+      display: flex;
+      justify-content: center;
+      padding-top: 8px;
+    }
+
+    .signin-card {
+      width: 100%;
+      max-width: 360px;
+      padding: 28px 28px 22px;
+      border-radius: 14px;
+      background: var(--paper-raised);
+      box-shadow: var(--shadow-capsule);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .signin-head h2 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: var(--weight-medium);
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+      color: var(--ink-12);
+    }
+
+    .signin-head p {
+      margin: 4px 0 0;
+      font-size: var(--text-sm);
+      color: var(--ink-11);
+      text-wrap: pretty;
+    }
+
+    .signin-form {
       display: flex;
       flex-direction: column;
       gap: 14px;
     }
 
-    .anki-account-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    .anki-account-head .spec-row-desc {
-      margin-top: 3px;
-    }
-
-    .anki-login-form {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .anki-account-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: var(--text-sm);
-      font-weight: var(--weight-medium);
-      color: var(--ink-12);
-    }
-
-    .anki-account-fields {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-    }
-
-    @media (max-width: 600px) {
-      .anki-account-fields {
-        grid-template-columns: 1fr;
-      }
-    }
-
     .anki-field {
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 6px;
     }
 
     .anki-field label {
       font-size: var(--text-xs);
       font-weight: var(--weight-medium);
       color: var(--ink-11);
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    .input-wrap .text-input {
+      padding-right: 64px;
+    }
+
+    .reveal-btn {
+      position: absolute;
+      top: 50%;
+      right: 4px;
+      transform: translateY(-50%);
+      min-height: 36px;
+      padding: 0 10px;
+      border-radius: 6px;
+      font-size: var(--text-xs);
+      font-weight: var(--weight-medium);
+      color: var(--ink-11);
+      transition: color 150ms ease, background-color 150ms ease;
+    }
+
+    .signin-advanced summary {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 32px;
+      font-size: var(--text-xs);
+      color: var(--ink-11);
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+    }
+
+    .signin-advanced summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .signin-advanced summary .icon {
+      width: 14px;
+      height: 14px;
+      transition: transform 160ms var(--ease-out-quart);
+    }
+
+    .signin-advanced[open] summary .icon {
+      transform: rotate(90deg);
+    }
+
+    .signin-advanced .anki-field {
+      margin-top: 6px;
+    }
+
+    .signin-form .btn-amber {
+      width: 100%;
+      min-height: 46px;
+      margin-top: 4px;
+    }
+
+    .signin-note {
+      margin: 0;
+      font-size: var(--text-xs);
+      line-height: 1.45;
+      color: var(--ink-9);
+      text-align: center;
+      text-wrap: balance;
+    }
+
+    .anki-account-status {
+      font-size: var(--text-xs);
+      color: var(--ink-11);
+    }
+
+    .anki-account-status.ok {
+      color: var(--ok);
+    }
+
+    .anki-account-status.error {
+      color: var(--danger);
+    }
+
+    .signin-dialog {
+      width: min(400px, calc(100vw - 32px));
+      padding: 0;
+      border: 0;
+      border-radius: 16px;
+      background: transparent;
+      color: inherit;
+      overflow: visible;
+    }
+
+    .signin-dialog::backdrop {
+      background: rgb(12 10 8 / 0.42);
+    }
+
+    .signin-dialog .signin-card {
+      max-width: none;
+      box-shadow: var(--shadow-popover);
+    }
+
+    .dialog-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--ink-9);
+      transition: color 150ms ease, background-color 150ms ease;
     }
 
     .text-input {
@@ -1666,48 +1774,26 @@
       font-size: 16px;
     }
 
-    .anki-advanced {
-      font-size: var(--text-xs);
-      color: var(--ink-11);
-    }
-
-    .anki-advanced summary {
-      cursor: pointer;
-      user-select: none;
-      padding: 4px 0;
-      color: var(--ink-11);
-    }
-
-    .anki-advanced[open] summary {
-      margin-bottom: 8px;
-    }
-
-    .anki-account-actions {
+    .domain-group {
       display: flex;
-      align-items: center;
+      flex-direction: column;
       gap: 10px;
-      flex-wrap: wrap;
+      padding: 14px 0 16px;
+      border-bottom: var(--hairline) solid var(--ink-line);
     }
 
-    .anki-account-note {
-      font-size: var(--text-xs);
-      color: var(--ink-11);
-      line-height: 1.45;
+    .domain-group:last-child {
+      border-bottom: 0;
+    }
+
+    .domain-group-label {
       margin: 0;
-    }
-
-    .anki-account-status {
-      font-size: var(--text-xs);
-      color: var(--ink-11);
-      min-height: 18px;
-    }
-
-    .anki-account-status.ok {
-      color: var(--ok);
-    }
-
-    .anki-account-status.error {
-      color: var(--danger);
+      font-size: 11px;
+      font-weight: var(--weight-medium);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-9);
+      font-variant-numeric: tabular-nums;
     }
 
     .domain-chips {
@@ -1966,9 +2052,9 @@
       </div>
 
       <div class="stage-lower">
-        <section id="interceptCard" class="floating-card">
+        <section id="interceptCard" class="floating-card intercept-card">
           <div>
-            <h2 id="interceptTitle" class="floating-title">Site blocked</h2>
+            <h2 id="interceptTitle" class="floating-title">Site paused</h2>
             <div id="interceptSub" class="floating-sub"></div>
           </div>
           <button id="bypassBtn" type="button" class="bypass-btn" disabled>
@@ -2006,7 +2092,7 @@
             <h2 class="section-title">Flashcards</h2>
           </div>
 
-          <div class="spec-bar">
+          <div id="ankiSpecBar" class="spec-bar">
             <div class="spec-left">
               <div class="deck-picker" id="deckPicker">
                 <button
@@ -2049,6 +2135,41 @@
             </div>
           </div>
 
+          <div id="ankiSignInSlot" class="signin-slot hidden">
+            <section id="ankiSignInCard" class="signin-card" aria-labelledby="ankiSignInTitle">
+              <div class="signin-head">
+                <h2 id="ankiSignInTitle">Sign in to AnkiWeb</h2>
+                <p>Study your decks here while agents work.</p>
+              </div>
+              <form id="ankiLoginForm" class="signin-form">
+                <div class="anki-field">
+                  <label for="ankiEmailInput">Email</label>
+                  <input id="ankiEmailInput" type="text" inputmode="email" class="text-input" autocomplete="username" autocapitalize="off" spellcheck="false" required />
+                </div>
+                <div class="anki-field">
+                  <label for="ankiPasswordInput">Password</label>
+                  <div class="input-wrap">
+                    <input id="ankiPasswordInput" type="password" class="text-input" autocomplete="current-password" required />
+                    <button id="ankiRevealBtn" type="button" class="reveal-btn" aria-pressed="false" aria-label="Show password">Show</button>
+                  </div>
+                </div>
+                <details id="ankiAdvanced" class="signin-advanced">
+                  <summary>
+                    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 6 15 12 9 18" /></svg>
+                    Custom sync server
+                  </summary>
+                  <div class="anki-field">
+                    <label for="ankiEndpointInput">Server URL</label>
+                    <input id="ankiEndpointInput" type="url" class="text-input" placeholder="https://sync.example.com/" autocomplete="off" autocapitalize="off" spellcheck="false" />
+                  </div>
+                </details>
+                <button id="ankiLoginBtn" type="submit" class="btn btn-amber">Sign in &amp; sync</button>
+                <div id="ankiLoginMsg" class="anki-account-status hidden" role="status" aria-live="polite"></div>
+              </form>
+              <p class="signin-note">Password is used once to fetch a sync token and never stored.</p>
+            </section>
+          </div>
+
           <article id="ankiSheet" class="linen-sheet">
             <div class="sheet-progress" aria-hidden="true">
               <div id="sheetProgressFill" class="sheet-progress-fill"></div>
@@ -2075,7 +2196,7 @@
             </div>
           </article>
 
-          <div class="action-slot">
+          <div id="ankiActionSlot" class="action-slot">
             <div id="ankiSkeletonAction" class="skeleton-line" style="width: 100%; height: 48px; margin: 0;"></div>
 
             <div id="showAnswerWrap" class="action-row hidden">
@@ -2096,7 +2217,7 @@
             </div>
           </div>
 
-          <div class="kbd-footer">
+          <div id="ankiKbdFooter" class="kbd-footer">
             <div id="kbdHints" class="kbd-group hidden">
               <span id="hintFlip" class="kbd-pair"><kbd>Space</kbd><span>show answer</span></span>
               <span id="hintRate" class="kbd-pair hidden"><kbd>1</kbd><span>to</span><kbd>4</kbd><span>rate</span></span>
@@ -2152,33 +2273,17 @@
                 </span>
                 <span>Chime</span>
               </button>
-              <button id="breathToggleBtn" type="button" class="btn" aria-pressed="true">Pause</button>
+              <button id="breathToggleBtn" type="button" class="btn btn-ghost" aria-pressed="true">Pause</button>
             </div>
           </div>
 
-          <div class="rest-instrument">
-            <div class="breath-dial">
-              <svg id="breathDialSvg" class="breath-dial-svg" viewBox="0 0 248 248" aria-hidden="true">
-                <g id="dialTicks"></g>
-                <circle class="dial-track" cx="124" cy="124" r="102" />
-                <circle id="dialProgress" class="dial-progress" cx="124" cy="124" r="102" stroke-dasharray="640.88" stroke-dashoffset="640.88" />
-              </svg>
-
-              <div id="bloomOuter" class="breath-bloom bloom-outer" aria-hidden="true"></div>
-              <div id="bloomMid" class="breath-bloom bloom-mid" aria-hidden="true"></div>
-              <div id="bloomCore" class="breath-bloom bloom-core" aria-hidden="true"></div>
-
-              <div class="breath-readout">
-                <span id="breathPhaseName" class="breath-phase-name">Inhale</span>
-              </div>
+          <div class="rest-stage">
+            <div id="bloom" class="bloom" aria-hidden="true">
+              <span class="petal"></span><span class="petal"></span><span class="petal"></span>
+              <span class="petal"></span><span class="petal"></span><span class="petal"></span>
             </div>
-
-            <div id="phaseStrip" class="phase-strip" aria-hidden="true"></div>
-
-            <div class="rest-footer">
-              <span>Look at something across the room.</span>
-              <span id="breathCycles" class="tabular">0 cycles</span>
-            </div>
+            <div id="breathPhaseName" class="breath-phase-name">Inhale</div>
+            <p id="restNote" class="rest-note">0 cycles</p>
           </div>
         </section>
 
@@ -2189,50 +2294,21 @@
 
           <div class="spec-group" id="ankiSyncSettings">
             <h3 class="spec-group-title">Anki sync</h3>
-            <div class="anki-account-card">
-              <div class="anki-account-head">
-                <div>
-                  <div class="anki-account-badge">
-                    <span id="ankiAccountDot" class="sync-dot" aria-hidden="true"></span>
-                    <span id="ankiAccountTitle">Not signed in</span>
-                  </div>
-                  <div id="ankiAccountDesc" class="spec-row-desc">Sign in once. Reviews sync quietly in the background.</div>
+            <div class="spec-row">
+              <div>
+                <div class="spec-row-title anki-row-title">
+                  <span id="ankiAccountDot" class="sync-dot" aria-hidden="true"></span>
+                  <span id="ankiAccountTitle">AnkiWeb</span>
                 </div>
+                <div id="ankiAccountDesc" class="spec-row-desc">Not connected</div>
               </div>
-
-              <form id="ankiLoginForm" class="anki-login-form hidden">
-                <div class="anki-account-fields">
-                  <div class="anki-field">
-                    <label for="ankiEmailInput">Email or username</label>
-                    <input id="ankiEmailInput" type="text" class="text-input" autocomplete="username" autocapitalize="off" spellcheck="false" required />
-                  </div>
-                  <div class="anki-field">
-                    <label for="ankiPasswordInput">Password</label>
-                    <input id="ankiPasswordInput" type="password" class="text-input" autocomplete="current-password" required />
-                  </div>
-                </div>
-
-                <details class="anki-advanced">
-                  <summary>Custom sync server</summary>
-                  <div class="anki-field">
-                    <label for="ankiEndpointInput">Server URL (leave blank for AnkiWeb)</label>
-                    <input id="ankiEndpointInput" type="url" class="text-input" placeholder="https://sync.example.com/" autocapitalize="off" spellcheck="false" />
-                  </div>
-                </details>
-
-                <div class="anki-account-actions">
-                  <button id="ankiLoginBtn" type="submit" class="btn btn-amber">Sign in</button>
-                </div>
-                <p class="anki-account-note">Your password is used once to get a sync key and is never saved. Your collection is cached locally in its own folder.</p>
-              </form>
-
-              <div id="ankiSignedInActions" class="anki-account-actions hidden">
-                <button id="ankiSettingsSyncBtn" type="button" class="btn">Sync now</button>
-                <button id="ankiLogoutBtn" type="button" class="btn btn-ghost">Sign out</button>
+              <div class="row-actions">
+                <button id="ankiOpenSignInBtn" type="button" class="btn hidden">Sign in</button>
+                <button id="ankiSettingsSyncBtn" type="button" class="btn btn-ghost hidden">Sync</button>
+                <button id="ankiLogoutBtn" type="button" class="btn btn-ghost hidden">Sign out</button>
               </div>
-
-              <div id="ankiAccountMsg" class="anki-account-status hidden" role="status" aria-live="polite"></div>
             </div>
+            <div id="ankiAccountMsg" class="anki-account-status hidden" role="status" aria-live="polite"></div>
           </div>
 
           <div class="spec-group">
@@ -2277,7 +2353,7 @@
               <input id="addDomainInput" class="text-input" placeholder="reddit.com" autocomplete="off" autocapitalize="off" spellcheck="false" />
               <button type="submit" class="btn">Add</button>
             </form>
-            <div id="domainsList" class="domain-chips"></div>
+            <div id="domainsList"></div>
           </div>
         </section>
       </div>
@@ -2299,6 +2375,12 @@
     <span id="undoText">Cleared</span>
     <button id="undoActionBtn" type="button" class="toast-undo">Undo</button>
   </div>
+
+  <dialog id="ankiDialog" class="signin-dialog" aria-labelledby="ankiSignInTitle">
+    <button id="ankiDialogClose" type="button" class="dialog-close" aria-label="Close">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></svg>
+    </button>
+  </dialog>
 
   <div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-label="Enlarged flashcard image" data-open="false">
     <div class="lightbox-inner">
@@ -2340,6 +2422,85 @@
     let lightboxTriggerEl = null;
     let undoTimer = null;
     let undoHandler = null;
+
+    // <domain-classifier> Groups blocked domains for display only; config.json stays a flat list.
+    const DOMAIN_CATEGORY_ORDER = ["Mail & Messaging", "Social", "News", "Tech & Forums", "Video & Media", "Other"];
+    // A curated name matches the domain itself and its subdomains. "name.*" matches that label under any suffix.
+    const CURATED_DOMAINS = {
+      "Mail & Messaging": [
+        "mail.proton.me", "proton.me", "protonmail.com", "gmail.com", "mail.google.com", "outlook.*", "hotmail.com",
+        "live.com", "mail.yahoo.com", "icloud.com", "fastmail.com", "hey.com", "tuta.com", "tutanota.com", "posteo.de",
+        "mailbox.org", "gmx.*", "web.de", "t-online.de", "freenet.de", "superhuman.com", "slack.com", "discord.com",
+        "discord.gg", "whatsapp.com", "web.whatsapp.com", "telegram.org", "web.telegram.org", "signal.org",
+        "messenger.com", "teams.microsoft.com", "teams.live.com", "chat.google.com", "element.io", "zulip.com",
+      ],
+      Social: [
+        "reddit.com", "redd.it", "linkedin.com", "x.com", "twitter.com", "instagram.com", "tiktok.com", "facebook.com",
+        "fb.com", "threads.net", "threads.com", "bsky.app", "mastodon.social", "mastodon.online", "snapchat.com",
+        "pinterest.*", "tumblr.com", "quora.com", "xing.com", "vk.com", "9gag.com", "imgur.com",
+        "nextdoor.com", "bereal.com", "lemmy.world",
+      ],
+      News: [
+        "tagesschau.de", "spiegel.de", "zeit.de", "faz.net", "sueddeutsche.de", "welt.de", "n-tv.de", "handelsblatt.com",
+        "nzz.ch", "focus.de", "stern.de", "bild.de", "taz.de", "tagesspiegel.de", "fr.de", "rnd.de",
+        "zdf.de", "zdfheute.de", "ard.de", "br.de", "ndr.de", "wdr.de", "swr.de", "mdr.de", "deutschlandfunk.de",
+        "dw.com", "orf.at", "derstandard.at", "diepresse.com", "krone.at", "srf.ch", "tagesanzeiger.ch", "20min.ch",
+        "watson.ch", "watson.de", "wiwo.de", "manager-magazin.de", "capital.de", "businessinsider.de", "nytimes.com",
+        "bbc.com", "bbc.co.uk", "theguardian.com", "reuters.com", "apnews.com", "bloomberg.com", "ft.com", "wsj.com",
+        "economist.com", "washingtonpost.com", "cnn.com", "nbcnews.com", "cbsnews.com", "abcnews.go.com", "foxnews.com",
+        "npr.org", "politico.com", "politico.eu", "axios.com", "theatlantic.com", "newyorker.com", "vox.com",
+        "aljazeera.com", "lemonde.fr", "elpais.com", "corriere.it", "news.google.com", "news.yahoo.com", "msn.com",
+        "substack.com", "medium.com", "semafor.com", "theinformation.com",
+      ],
+      "Tech & Forums": [
+        "news.ycombinator.com", "ycombinator.com", "lobste.rs", "techcrunch.com", "theverge.com", "arstechnica.com",
+        "heise.de", "golem.de", "t3n.de", "netzpolitik.org", "computerbase.de", "chip.de", "winfuture.de",
+        "stadt-bremerhaven.de", "caschys.blog", "wired.com", "engadget.com", "9to5mac.com",
+        "macrumors.com", "appleinsider.com", "daringfireball.net", "slashdot.org", "theregister.com", "tomshardware.com",
+        "anandtech.com", "gizmodo.com", "mashable.com", "zdnet.com", "venturebeat.com", "techmeme.com",
+        "stackoverflow.com", "stackexchange.com", "dev.to", "hashnode.com", "lemmy.ml", "tildes.net",
+        "news.slashdot.org", "indiehackers.com", "producthunt.com", "macuser.de", "mactechnews.de", "iphone-ticker.de",
+      ],
+      "Video & Media": [
+        "youtube.com", "youtu.be", "m.youtube.com", "twitch.tv", "netflix.com", "primevideo.com", "disneyplus.com",
+        "hulu.com", "max.com", "hbomax.com", "tv.apple.com", "music.apple.com", "spotify.com", "open.spotify.com",
+        "soundcloud.com", "vimeo.com", "dailymotion.com", "kick.com", "crunchyroll.com", "paramountplus.com",
+        "peacocktv.com", "joyn.de", "rtlplus.com", "rtl.de", "prosieben.de", "sat1.de", "waipu.tv", "zattoo.com",
+        "ardmediathek.de", "arte.tv", "mubi.com", "letterboxd.com", "imdb.com", "nebula.tv",
+        "patreon.com", "steampowered.com", "store.steampowered.com", "twitch.com",
+      ],
+    };
+    // Checked in order after the curated list misses. Boundaries keep "post" off postbank.de and "times" off timesheet.io.
+    const DOMAIN_KEYWORDS = [
+      ["Mail & Messaging", /(^|[.-])(web)?mail|inbox|(^|\.)post\.|messenger|whatsapp|telegram/],
+      ["News", /news|nachrichten|zeitung|presse|times(?=\.|$)|post(?=\.|$)|herald|tribune|journal|gazette|daily|kurier|anzeiger|rundschau|tagblatt|abendblatt|merkur|express(?=\.|$)/],
+      ["Video & Media", /tube|video|stream|(^|[.-])tv(?=\.|$)|movie|film|kino|music|musik|radio|podcast|mediathek|anime/],
+      ["Tech & Forums", /forum|board(?=\.|$)|community|tech|hacker|stackexchange|developer|(^|\.)dev(?=\.|$)|lemmy|discourse|bbs/],
+      ["Social", /social|mastodon|gram(?=\.|$)|book(?=\.|$)|tok(?=\.|$)|bsky|threads/],
+    ];
+
+    function classifyDomain(domain) {
+      const host = String(domain).toLowerCase().replace(/^www\./, "");
+      const labels = host.split(".");
+      for (const category of DOMAIN_CATEGORY_ORDER) {
+        for (const entry of CURATED_DOMAINS[category] || []) {
+          if (entry.endsWith(".*") ? labels.slice(0, -1).includes(entry.slice(0, -2)) : host === entry || host.endsWith(`.${entry}`)) {
+            return category;
+          }
+        }
+      }
+      const match = DOMAIN_KEYWORDS.find(([, re]) => re.test(host));
+      return match ? match[0] : "Other";
+    }
+
+    function groupDomains(domains) {
+      const groups = new Map(DOMAIN_CATEGORY_ORDER.map((c) => [c, []]));
+      domains.forEach((d) => groups.get(classifyDomain(d)).push(d));
+      return [...groups]
+        .filter(([, list]) => list.length)
+        .map(([category, list]) => [category, list.sort((a, b) => a.localeCompare(b))]);
+    }
+    // </domain-classifier>
 
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -2530,9 +2691,9 @@
     }
 
     function updateInterceptCopy() {
-      $("interceptTitle").textContent = `${fromDomain} is blocked`;
+      $("interceptTitle").textContent = `${fromDomain} paused`;
       const autoRestore = state ? state.config.auto_restore : true;
-      $("interceptSub").textContent = autoRestore ? "Reopens when all runs finish" : "Agent still running";
+      $("interceptSub").textContent = autoRestore ? "Reopens when your agents finish" : "Here when your agents finish";
     }
 
     function updateBypassGate() {
@@ -2762,9 +2923,13 @@
       $("bypassesList").innerHTML = bypassEntries.map(([dom, secs]) => (
         `<span class="chip">${escapeHtml(dom)} (${secs}s)<button type="button" class="chip-remove" data-revoke="${escapeHtml(dom)}" aria-label="Block ${escapeHtml(dom)} again">&times;</button></span>`
       )).join("");
-      $("domainsList").innerHTML = state.config.blocked_domains.map((d) => (
-        `<span class="chip">${escapeHtml(d)}<button type="button" class="chip-remove" data-remove="${escapeHtml(d)}" aria-label="Remove ${escapeHtml(d)}">&times;</button></span>`
-      )).join("");
+      $("domainsList").innerHTML = groupDomains(state.config.blocked_domains).map(([category, domains]) => `
+        <section class="domain-group" aria-label="${escapeHtml(category)}">
+          <h4 class="domain-group-label">${escapeHtml(category)} · ${domains.length}</h4>
+          <div class="domain-chips">${domains.map((d) => (
+            `<span class="chip">${escapeHtml(d)}<button type="button" class="chip-remove" data-remove="${escapeHtml(d)}" aria-label="Remove ${escapeHtml(d)}">&times;</button></span>`
+          )).join("")}</div>
+        </section>`).join("");
     }
 
     $("bypassesList").addEventListener("click", (e) => {
@@ -3007,13 +3172,16 @@
       }
     }
 
-    function goToAnkiSignIn() {
-      sfx("tick");
-      setActiveTab("settings", false, false);
-      setTimeout(() => $("ankiEmailInput").focus(), 80);
+    // Signed out: swap the study surface for the inline sign-in card.
+    function setSignInView(on) {
+      ["ankiSpecBar", "ankiSheet", "ankiActionSlot", "ankiKbdFooter"].forEach((id) => $(id).classList.toggle("hidden", on));
+      $("ankiSignInSlot").classList.toggle("hidden", !on);
     }
 
     function renderAnkiCard(animateNext = false) {
+      const signInView = !ankiLoadError && ankiData?.source === "signed_out";
+      setSignInView(signInView);
+      if (signInView) return;
       updateStudyMetaBar();
       if (animateNext && !prefersReducedMotion.matches) restartAnimation($("ankiSheet"), "settling");
 
@@ -3027,10 +3195,8 @@
         $("rateWrap").classList.add("hidden");
         if (ankiLoadError) {
           showEmptyState("Couldn’t load cards", "Agent Focus isn’t responding. Check that it’s running, then retry.", ["Retry", loadAnki]);
-        } else if (ankiData.source === "unavailable") {
-          showEmptyState("Connect AnkiWeb", "Run ./install.sh to add the anki package, then sign in in Settings.", ["Sign in to AnkiWeb", goToAnkiSignIn]);
         } else if (!ankiData.signed_in) {
-          showEmptyState("Connect AnkiWeb", "Sign in once in Settings for silent two-way sync.", ["Sign in to AnkiWeb", goToAnkiSignIn]);
+          showEmptyState("Flashcards need the anki package", "Run ./install.sh in your Agent Focus folder, then reload this page.", ["Reload", () => window.location.reload()]);
         } else if (ankiData.source === "error") {
           showEmptyState("Couldn’t read your cards", "The local Anki cache had a problem. Sync to repair it.", ["Sync", syncAnkiNow]);
         } else if (ankiData.total_cards > 0 && ankiStudyMode !== "all") {
@@ -3187,37 +3353,67 @@
       btn.addEventListener("click", () => rateAnki(btn.dataset.ease, true, btn));
     });
 
-    // Anki account card in Settings
-    function setAnkiAccountMsg(text, kind = "") {
-      const el = $("ankiAccountMsg");
+    // AnkiWeb account: one sign-in card, shown inline on Flashcards or moved into a dialog from Settings.
+    function setMsg(id, text, kind = "") {
+      const el = $(id);
       el.textContent = text;
       el.className = `anki-account-status ${kind}`.trim();
       el.classList.toggle("hidden", !text);
     }
+    const setAnkiAccountMsg = (text, kind) => setMsg("ankiAccountMsg", text, kind);
+    const setLoginMsg = (text, kind) => setMsg("ankiLoginMsg", text, kind);
 
     async function loadAnkiAccount() {
-      const res = await fetch("/api/anki/account");
-      if (!res.ok) return;
+      const res = await fetch("/api/anki/account").catch(() => null);
+      if (!res?.ok) return;
       const info = await res.json();
       $("ankiAccountDot").classList.toggle("live", info.signed_in);
-      $("ankiLoginForm").classList.toggle("hidden", info.signed_in || !info.available);
-      $("ankiSignedInActions").classList.toggle("hidden", !info.signed_in);
-
+      $("ankiOpenSignInBtn").classList.toggle("hidden", info.signed_in || !info.available);
+      $("ankiSettingsSyncBtn").classList.toggle("hidden", !info.signed_in);
+      $("ankiLogoutBtn").classList.toggle("hidden", !info.signed_in);
       if (info.signed_in) {
-        $("ankiAccountTitle").textContent = `${info.account || "Signed in"} · ${info.endpoint_label}`;
-        $("ankiAccountDesc").textContent = "Reviews sync in the background.";
-      } else if (!info.available) {
-        $("ankiAccountTitle").textContent = "Anki package not installed";
-        $("ankiAccountDesc").textContent = "Run ./install.sh to add it, then sign in here.";
+        $("ankiAccountTitle").textContent = info.account || "Signed in";
+        $("ankiAccountDesc").textContent = `${info.endpoint_label} · Silent auto-sync active`;
       } else {
-        $("ankiAccountTitle").textContent = "Not signed in";
-        $("ankiAccountDesc").textContent = "Sign in once. Reviews sync quietly in the background.";
+        $("ankiAccountTitle").textContent = "AnkiWeb";
+        $("ankiAccountDesc").textContent = info.available ? "Not connected" : "Needs the anki package. Run ./install.sh.";
       }
     }
+
+    const isTouch = "ontouchstart" in window;
+
+    function openSignInDialog() {
+      sfx("tick");
+      setLoginMsg("");
+      $("ankiDialog").appendChild($("ankiSignInCard"));
+      $("ankiDialog").showModal();
+      if (!isTouch) $("ankiEmailInput").focus();
+    }
+
+    $("ankiDialog").addEventListener("close", () => {
+      $("ankiSignInSlot").appendChild($("ankiSignInCard"));
+      $("ankiPasswordInput").value = "";
+    });
+    $("ankiDialog").addEventListener("click", (e) => {
+      if (e.target === $("ankiDialog")) $("ankiDialog").close();
+    });
+    $("ankiDialogClose").addEventListener("click", () => $("ankiDialog").close());
+    $("ankiOpenSignInBtn").addEventListener("click", openSignInDialog);
+
+    $("ankiRevealBtn").addEventListener("click", () => {
+      const input = $("ankiPasswordInput");
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      $("ankiRevealBtn").textContent = show ? "Hide" : "Show";
+      $("ankiRevealBtn").setAttribute("aria-pressed", String(show));
+      $("ankiRevealBtn").setAttribute("aria-label", show ? "Hide password" : "Show password");
+      input.focus();
+    });
 
     $("ankiLoginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const btn = $("ankiLoginBtn");
+      if (btn.disabled) return;
       const body = {
         email: $("ankiEmailInput").value.trim(),
         password: $("ankiPasswordInput").value,
@@ -3225,24 +3421,28 @@
       };
       btn.disabled = true;
       btn.textContent = "Signing in…";
-      setAnkiAccountMsg("Signing in and downloading your collection…");
+      setLoginMsg("Downloading your collection. This can take a minute the first time.");
       try {
         const res = await postJSON("/api/anki/login", body);
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
           sfx("confirm");
-          setAnkiAccountMsg("Signed in and synced.", "ok");
+          setLoginMsg("");
+          $("ankiPasswordInput").value = "";
+          if ($("ankiDialog").open) {
+            $("ankiDialog").close();
+            setAnkiAccountMsg("Signed in and synced.", "ok");
+          }
           await loadAnkiAccount();
           await loadAnki();
         } else {
-          setAnkiAccountMsg(data.error || "Sign-in failed. Check your email and password.", "error");
+          setLoginMsg(data.error || "Sign-in failed. Check your email and password.", "error");
         }
       } catch (_) {
-        setAnkiAccountMsg("Agent Focus isn’t responding.", "error");
+        setLoginMsg("Agent Focus isn’t responding.", "error");
       } finally {
-        $("ankiPasswordInput").value = "";
         btn.disabled = false;
-        btn.textContent = "Sign in";
+        btn.textContent = "Sign in & sync";
       }
     });
 
@@ -3250,7 +3450,7 @@
       const btn = $("ankiSettingsSyncBtn");
       btn.disabled = true;
       btn.textContent = "Syncing…";
-      setAnkiAccountMsg("Syncing…");
+      setAnkiAccountMsg("");
       try {
         const res = await postJSON("/api/anki/sync", { media: true });
         const data = await res.json().catch(() => ({}));
@@ -3261,9 +3461,11 @@
         } else {
           setAnkiAccountMsg(data.error || "Sync failed.", "error");
         }
+      } catch (_) {
+        setAnkiAccountMsg("Agent Focus isn’t responding.", "error");
       } finally {
         btn.disabled = false;
-        btn.textContent = "Sync now";
+        btn.textContent = "Sync";
       }
     });
 
@@ -3275,6 +3477,7 @@
       await loadAnki();
     });
 
+    loadAnkiAccount();
     loadAnkiAccount();
 
     // Image lightbox
@@ -3403,7 +3606,7 @@
       });
     });
 
-    // Rest: one sweep of the dial per breath cycle
+    // Rest: six translucent petals open on the inhale and fold in on the exhale.
     const CADENCES = {
       slow: [
         { name: "Inhale", sec: 5.5, dir: "in" },
@@ -3418,11 +3621,10 @@
         { name: "Inhale", sec: 4, dir: "in" },
         { name: "Hold", sec: 4, dir: "hold_in" },
         { name: "Exhale", sec: 4, dir: "out" },
-        { name: "Rest", sec: 4, dir: "hold_out" },
+        { name: "Hold", sec: 4, dir: "hold_out" },
       ],
     };
 
-    const DIAL_CIRC = 2 * Math.PI * 102;
     const savedCadence = localStorage.getItem("agentFocusCadence");
     let activeCadenceKey = CADENCES[savedCadence] ? savedCadence : "slow";
     let breathRunning = true;
@@ -3431,32 +3633,21 @@
     let breathLastPhaseIdx = -1;
     let breathCyclesDone = 0;
     let breathRaf = null;
-
-    $("dialTicks").innerHTML = Array.from({ length: 60 }, (_, i) => {
-      const angle = (i / 60) * Math.PI * 2 - Math.PI / 2;
-      const major = i % 5 === 0;
-      const point = (r) => [(124 + Math.cos(angle) * r).toFixed(2), (124 + Math.sin(angle) * r).toFixed(2)];
-      const [x1, y1] = point(major ? 111 : 114);
-      const [x2, y2] = point(120);
-      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="dial-tick${major ? " major" : ""}" stroke-width="${major ? 1.4 : 0.9}" />`;
-    }).join("");
-
-    function renderPhaseStrip(activeIdx = 0) {
-      $("phaseStrip").innerHTML = CADENCES[activeCadenceKey].map((p, idx) => (
-        `<span class="phase-step${idx === activeIdx ? " active" : ""}">${p.name} ${p.sec}s</span>`
-      )).join("");
-    }
+    const petals = [...document.querySelectorAll("#bloom .petal")];
 
     function setBloomLevel(level) {
-      if (prefersReducedMotion.matches) {
-        ["bloomOuter", "bloomMid", "bloomCore"].forEach((id) => { $(id).style.transform = "scale(1)"; });
-        return;
-      }
-      $("bloomOuter").style.transform = `scale(${(0.88 + 0.28 * level).toFixed(4)})`;
-      $("bloomOuter").style.opacity = (0.35 + 0.42 * level).toFixed(3);
-      $("bloomMid").style.transform = `scale(${(0.9 + 0.2 * level).toFixed(4)})`;
-      $("bloomMid").style.opacity = (0.48 + 0.36 * level).toFixed(3);
-      $("bloomCore").style.transform = `scale(${(0.95 + 0.08 * level).toFixed(4)})`;
+      const l = prefersReducedMotion.matches ? 0.6 : level;
+      $("bloom").style.transform = `rotate(${(l * 60).toFixed(2)}deg)`;
+      petals.forEach((petal, i) => {
+        petal.style.transform = `rotate(${i * 60}deg) translateY(${(-4 - 42 * l).toFixed(2)}px) scale(${(0.5 + 0.5 * l).toFixed(4)})`;
+        petal.style.opacity = (0.55 + 0.45 * l).toFixed(3);
+      });
+    }
+
+    function renderRestNote() {
+      $("restNote").textContent = breathAudioOn
+        ? "Close your eyes or look away. Soft chimes mark each breath."
+        : `${breathCyclesDone} ${breathCyclesDone === 1 ? "cycle" : "cycles"}`;
     }
 
     function breathChime(phaseName) {
@@ -3476,9 +3667,8 @@
         breathCyclesDone += completed;
         breathCycleStart += completed * totalSec * 1000;
         cycleElapsed = (now - breathCycleStart) / 1000;
-        $("breathCycles").textContent = `${breathCyclesDone} ${breathCyclesDone === 1 ? "cycle" : "cycles"}`;
+        renderRestNote();
       }
-      $("dialProgress").style.strokeDashoffset = String(DIAL_CIRC * (1 - Math.min(1, cycleElapsed / totalSec)));
 
       let phaseIdx = 0;
       let phaseStart = 0;
@@ -3491,7 +3681,6 @@
       if (phaseIdx !== breathLastPhaseIdx) {
         breathLastPhaseIdx = phaseIdx;
         $("breathPhaseName").textContent = phase.name;
-        renderPhaseStrip(phaseIdx);
         breathChime(phase.name);
       }
 
@@ -3538,14 +3727,12 @@
         localStorage.setItem("agentFocusCadence", activeCadenceKey);
         markActiveCadence();
         breathLastPhaseIdx = -1;
-        renderPhaseStrip(0);
         if (breathRunning) {
           startRestLoop();
           return;
         }
         $("breathPhaseName").textContent = CADENCES[activeCadenceKey][0].name;
         setBloomLevel(0);
-        $("dialProgress").style.strokeDashoffset = String(DIAL_CIRC);
       });
     });
 
@@ -3564,11 +3751,13 @@
       breathAudioOn = !breathAudioOn;
       $("breathAudioBtn").setAttribute("aria-pressed", String(breathAudioOn));
       $("breathAudioSwap").setAttribute("data-swapped", String(breathAudioOn));
+      renderRestNote();
       if (breathAudioOn) breathChime("Inhale");
       else sfx("tick");
     });
 
-    renderPhaseStrip(0);
+    setBloomLevel(0);
+    renderRestNote();
 
     const tabParam = params.get("tab");
     const savedTab = localStorage.getItem("agentFocusTab");
