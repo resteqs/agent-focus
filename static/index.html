@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Agent Focus</title>
+  <link rel="icon" href="data:," />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -12,20 +13,16 @@
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
   <style>
     :root {
-      /* Fixed z-index scale */
       --z-nav: 100;
       --z-popover: 150;
       --z-modal: 200;
       --z-toast: 300;
 
-      /* Emil easing curve tokens (techniques.md) */
       --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
       --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
       --ease-enter: cubic-bezier(0.32, 0.72, 0, 1);
       --ease-icon-swap: cubic-bezier(0.25, 0.1, 0, 1);
-      --ease-in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
 
-      /* Two families only: grotesque for display + UI, mono for paths/keys */
       --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
       --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
@@ -33,18 +30,13 @@
       --weight-medium: 500;
       --weight-semibold: 600;
 
-      /* Type scale */
       --text-xs: 12px;
       --text-sm: 14px;
       --text-base: 16px;
-      --text-lg: 20px;
-      --text-card: 24px;
       --text-display: 52px;
 
-      /* Density-aware hairline */
       --hairline: 1px;
 
-      /* Warm paper + charcoal scale in OKLCH (fixed warm hue 82°) */
       --paper-1: oklch(0.972 0.008 82);
       --paper-2: oklch(0.942 0.010 82);
       --paper-3: oklch(0.910 0.011 82);
@@ -56,7 +48,7 @@
       --ink-line: oklch(0.180 0.010 80 / 0.13);
       --ink-line-strong: oklch(0.180 0.010 80 / 0.24);
 
-      /* Left focus rail — compact deep warm charcoal */
+      /* Left rail */
       --stage-bg: oklch(0.145 0.008 80);
       --stage-surface: oklch(0.198 0.009 80);
       --stage-ink: oklch(0.955 0.007 82);
@@ -64,19 +56,16 @@
       --stage-line: oklch(0.955 0.007 82 / 0.14);
       --stage-focus: oklch(0.955 0.007 82);
 
-      /* Floating card on left rail */
       --card-bg: oklch(0.978 0.007 82);
       --card-ink: oklch(0.180 0.010 80);
       --card-muted: oklch(0.420 0.010 80);
       --card-focus: oklch(0.180 0.010 80);
 
-      /* Sunlit amber primary accent (Daylight DC-1) */
       --amber: oklch(0.750 0.168 68);
       --amber-hover: color-mix(in oklch, var(--amber) 90%, oklch(0.22 0.05 55));
       --amber-ink: oklch(0.160 0.016 65);
       --amber-soft: oklch(0.935 0.042 76);
 
-      /* Semantic states */
       --ok: oklch(0.480 0.115 152);
       --ok-ink: oklch(0.99 0.004 152);
       --ok-soft: oklch(0.935 0.030 152);
@@ -85,12 +74,10 @@
       --danger: oklch(0.515 0.148 26);
       --danger-soft: oklch(0.945 0.028 26);
 
-      /* Disabled & focus tokens */
       --bg-disabled: oklch(0.922 0.008 82);
       --text-disabled: oklch(0.455 0.010 80);
       --focus-ring: oklch(0.200 0.008 80);
 
-      /* Light elevation */
       --shadow-capsule:
         0 0 0 1px rgb(22 18 14 / 0.08),
         0 2px 4px rgb(22 18 14 / 0.04),
@@ -107,6 +94,8 @@
         0 2px 5px rgb(22 18 14 / 0.06);
 
       --img-outline: rgb(0 0 0 / 0.1);
+      /* Selected/highlighted row on a raised surface; paper-2 is too close to paper-raised in dark mode. */
+      --raised-selected: color-mix(in oklch, var(--ink-12) 7%, var(--paper-raised));
     }
 
     @media only screen and (min-device-pixel-ratio: 2), only screen and (min-resolution: 192dpi) {
@@ -235,10 +224,6 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* =====================================================================
-       TRUE VIEWPORT-CENTERED 3-TRACK SHELL
-       Track 1: dark focus rail | Track 2: centered canvas | Track 3: right switcher
-       ===================================================================== */
     .shell {
       --rail-w: clamp(268px, 21vw, 304px);
       display: grid;
@@ -246,7 +231,6 @@
       min-height: 100dvh;
     }
 
-    /* LEFT FOCUS RAIL */
     .stage {
       background: var(--stage-bg);
       color: var(--stage-ink);
@@ -338,7 +322,6 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* Floating Intercept / Restore Card */
     .stage-lower {
       display: flex;
       flex-direction: column;
@@ -391,6 +374,16 @@
       letter-spacing: -0.02em;
       color: var(--card-ink);
       overflow-wrap: break-word;
+    }
+
+    .restore-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .restore-actions .btn {
+      width: 100%;
     }
 
     .floating-sub {
@@ -480,9 +473,6 @@
       color: var(--stage-muted);
     }
 
-    /* =====================================================================
-       CENTERED PAPER WORKSPACE + RIGHT TASK SWITCHER RAIL
-       ===================================================================== */
     .paper-pane {
       background: var(--paper-1);
       padding: 44px clamp(20px, 3vw, 48px) 68px;
@@ -500,7 +490,6 @@
       gap: 24px;
     }
 
-    /* Right-side Task Switcher Rail */
     .nav-rail {
       background: var(--paper-1);
       padding: 28px 26px;
@@ -531,7 +520,7 @@
     .tab-btn {
       min-height: 44px;
       padding: 0 14px;
-      border-radius: 8px; /* 13 - 5 */
+      border-radius: 8px;
       font-size: var(--text-sm);
       font-weight: var(--weight-medium);
       color: var(--ink-11);
@@ -541,7 +530,7 @@
     }
 
     .tab-btn.active {
-      background: var(--paper-2);
+      background: var(--raised-selected);
       color: var(--ink-12);
     }
 
@@ -570,7 +559,6 @@
       text-wrap: balance;
     }
 
-    /* Buttons — Emil scale(0.96) tactile press */
     .btn {
       display: inline-flex;
       align-items: center;
@@ -612,26 +600,12 @@
       box-shadow: none;
     }
 
-    .btn-ok {
-      min-height: 44px;
-      padding: 0 16px;
-      border-radius: 8px;
-      background: var(--ok);
-      color: var(--ok-ink);
-      font-size: 12px;
-      font-weight: var(--weight-semibold);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      box-shadow: none;
-    }
-
     .btn-ghost {
       background: transparent;
       color: var(--ink-11);
       box-shadow: none;
     }
 
-    /* Emil Contextual Icon Swap (layered cross-fade: scale 0.3 + blur 3px) */
     .icon-swap {
       position: relative;
       display: inline-grid;
@@ -678,7 +652,6 @@
       stroke-linejoin: round;
     }
 
-    /* Hover gating for fine pointers only */
     @media (hover: hover) and (pointer: fine) {
       .btn:hover:not(:disabled) {
         box-shadow: var(--shadow-control-hover);
@@ -686,10 +659,6 @@
       }
       .btn-amber:hover:not(:disabled) {
         background: var(--amber-hover);
-        box-shadow: none;
-      }
-      .btn-ok:hover:not(:disabled) {
-        background: color-mix(in oklch, var(--ok) 88%, var(--ok-ink));
         box-shadow: none;
       }
       .btn-ghost:hover:not(:disabled) {
@@ -702,7 +671,7 @@
       .stage-btn-ghost:hover { background: var(--stage-surface); color: var(--stage-ink); }
       .bypass-btn.unlocked:hover { background: color-mix(in oklch, var(--card-ink) 14%, transparent); }
       .deck-trigger:hover { box-shadow: var(--shadow-control-hover); background: color-mix(in oklch, var(--paper-raised) 96%, var(--ink-12)); }
-      .deck-option:hover { background: var(--paper-2); }
+      .deck-option:hover { background: var(--raised-selected); }
       .rate-btn.again:hover { background: var(--danger-soft); color: var(--danger); box-shadow: 0 0 0 1px color-mix(in oklch, var(--danger) 42%, transparent); }
       .rate-btn.hard:hover  { background: var(--amber-soft); color: var(--ink-12); box-shadow: 0 0 0 1px color-mix(in oklch, var(--amber) 58%, transparent); }
       .rate-btn.good:hover  { background: var(--ok-soft); color: var(--ok); box-shadow: 0 0 0 1px color-mix(in oklch, var(--ok) 42%, transparent); }
@@ -711,9 +680,6 @@
       .seg-btn:hover { color: var(--ink-12); }
     }
 
-    /* =====================================================================
-       CUSTOM EMIL-CRAFTED DECK DROPDOWN (replaces native Safari <select>)
-       ===================================================================== */
     .spec-bar {
       display: flex;
       align-items: center;
@@ -752,7 +718,7 @@
     }
 
     .deck-trigger:active {
-      transform: scale(0.97);
+      transform: scale(0.96);
     }
 
     .deck-trigger-text {
@@ -790,7 +756,6 @@
       transform: rotate(180deg);
     }
 
-    /* Origin-aware Emil popover (patterns.md: scale 0.95 + translateY(-4px), faster exit) */
     .deck-menu {
       position: absolute;
       top: calc(100% + 6px);
@@ -808,7 +773,6 @@
       transform: scale(0.95) translateY(-4px);
       visibility: hidden;
       pointer-events: none;
-      will-change: transform, opacity;
       transition:
         opacity 130ms ease-in,
         transform 130ms ease-in,
@@ -838,7 +802,7 @@
       width: 100%;
       min-height: 44px;
       padding: 8px 10px;
-      border-radius: 7px; /* concentric: 12 - 5 */
+      border-radius: 7px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -846,11 +810,10 @@
       font-size: var(--text-sm);
       color: var(--ink-12);
       text-align: start;
-      /* Instant highlight for keyboard nav per Emil patterns.md */
     }
 
     .deck-option[data-highlighted="true"] {
-      background: var(--paper-2);
+      background: var(--raised-selected);
     }
 
     .deck-option-left {
@@ -878,7 +841,6 @@
       white-space: nowrap;
     }
 
-    /* Segmented Due | All control (exact same 44px height as deck dropdown!) */
     .seg-control {
       display: inline-flex;
       align-items: center;
@@ -891,14 +853,13 @@
       min-height: 38px;
       position: relative;
       padding: 0 14px;
-      border-radius: 7px; /* 10 - 3 */
+      border-radius: 7px;
       font-size: var(--text-sm);
       font-weight: var(--weight-medium);
       color: var(--ink-11);
       transition: background-color 150ms ease, color 150ms ease;
     }
 
-    /* Hit area >= 44px vertically via pseudo-element */
     .seg-btn::before {
       content: "";
       position: absolute;
@@ -917,7 +878,6 @@
       gap: 4px;
     }
 
-    /* Dot-only Anki connection indicator to the right of Sync with Emil hover tooltip */
     .sync-dot-wrap {
       position: relative;
       display: inline-flex;
@@ -971,7 +931,6 @@
       min-width: 82px;
     }
 
-    /* Warm Linen Flashcard Surface with hairline progress bar & reward glow */
     .linen-sheet {
       position: relative;
       overflow: hidden;
@@ -983,7 +942,6 @@
       flex-direction: column;
       justify-content: space-between;
       gap: 18px;
-      will-change: transform, opacity;
       transition: box-shadow 260ms var(--ease-out-quart);
     }
 
@@ -1013,7 +971,6 @@
       box-shadow: 0 0 0 1.5px color-mix(in oklch, var(--easy) 65%, transparent);
     }
 
-    /* Floating calm dopamine XP/encouragement whisper */
     .xp-float {
       position: fixed;
       pointer-events: none;
@@ -1026,7 +983,6 @@
       background: var(--paper-raised);
       box-shadow: var(--shadow-control);
       white-space: nowrap;
-      will-change: transform, opacity;
     }
 
     .combo-pill {
@@ -1043,7 +999,6 @@
       }
     }
 
-    /* Subtle tactile card arrival after rating (triggered only on rate, never on page load) */
     @keyframes cardSettle {
       from {
         opacity: 0.4;
@@ -1273,6 +1228,14 @@
       flex-wrap: wrap;
     }
 
+    .action-row .btn {
+      min-height: 48px;
+    }
+
+    .action-row .btn-amber {
+      flex: 1;
+    }
+
     .rate-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1349,7 +1312,6 @@
       color: var(--ink-11);
     }
 
-    /* SCRATCHPAD */
     .pad-area {
       width: 100%;
       min-height: 300px;
@@ -1387,9 +1349,10 @@
       font-size: var(--text-xs);
     }
 
-    /* =====================================================================
-       REST TAB — Precision Breathing Instrument (Braun × Daylight aesthetic)
-       ===================================================================== */
+    .spec-row .mono-path {
+      color: var(--ink-11);
+    }
+
     .rest-toolbar {
       display: flex;
       align-items: center;
@@ -1455,7 +1418,6 @@
       transform-origin: 124px 124px;
     }
 
-    /* Three concentric translucent rings — driven smoothly by sinusoidal rAF */
     .breath-bloom {
       position: absolute;
       border-radius: 50%;
@@ -1503,7 +1465,6 @@
       color: var(--ink-12);
     }
 
-    /* Phase timeline strip */
     .phase-strip {
       display: flex;
       align-items: center;
@@ -1544,7 +1505,6 @@
       flex-wrap: wrap;
     }
 
-    /* SETTINGS */
     .spec-group {
       display: flex;
       flex-direction: column;
@@ -1632,17 +1592,10 @@
       margin-bottom: 12px;
     }
 
-    .domain-input {
+    .domain-form .text-input {
       flex: 1;
-      min-height: 44px;
-      padding: 0 12px;
-      border-radius: 9px;
-      border: var(--hairline) solid var(--ink-line-strong);
-      background: var(--paper-raised);
-      font-size: 16px;
     }
 
-    /* Direct AnkiWeb / Custom Sync Server Card in Settings */
     .anki-account-card {
       padding: 16px 18px;
       border-radius: 12px;
@@ -1656,6 +1609,16 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
+    }
+
+    .anki-account-head .spec-row-desc {
+      margin-top: 3px;
+    }
+
+    .anki-login-form {
+      display: flex;
+      flex-direction: column;
       gap: 12px;
     }
 
@@ -1692,7 +1655,7 @@
       color: var(--ink-11);
     }
 
-    .anki-input {
+    .text-input {
       width: 100%;
       min-height: 44px;
       padding: 0 12px;
@@ -1784,7 +1747,6 @@
       inset: -10px;
     }
 
-    /* Undo Toast — Emil patterns.md enter/exit */
     .toast {
       position: fixed;
       right: 24px;
@@ -1803,7 +1765,6 @@
       transform: translateY(14px) scale(0.96);
       visibility: hidden;
       pointer-events: none;
-      will-change: transform, opacity;
       transition:
         opacity 150ms ease-in,
         transform 150ms ease-in,
@@ -1836,7 +1797,6 @@
       transform: scale(0.96);
     }
 
-    /* Modal Lightbox — Emil patterns.md paired overlay + modal scale(0.97) */
     .lightbox {
       position: fixed;
       inset: 0;
@@ -1901,7 +1861,6 @@
       outline-color: oklch(0.96 0.006 82);
     }
 
-    /* Confetti burst layer (GPU transform/opacity only, inert) */
     .spark-layer {
       position: fixed;
       inset: 0;
@@ -1916,7 +1875,6 @@
       height: 6px;
       border-radius: 50%;
       pointer-events: none;
-      will-change: transform, opacity;
     }
 
     .hidden {
@@ -1991,9 +1949,6 @@
   <div id="sparkLayer" class="spark-layer" aria-hidden="true"></div>
 
   <div class="shell">
-    <!-- ===============================================================
-         LEFT COMPACT FOCUS RAIL
-         =============================================================== -->
     <aside class="stage">
       <div class="stage-upper">
         <div class="stage-brand">Agent Focus</div>
@@ -2011,7 +1966,6 @@
       </div>
 
       <div class="stage-lower">
-        <!-- Intercepted Site Card with 30s Emergency Bypass Gate -->
         <section id="interceptCard" class="floating-card">
           <div>
             <h2 id="interceptTitle" class="floating-title">Site blocked</h2>
@@ -2026,14 +1980,13 @@
           </button>
         </section>
 
-        <!-- Run Finished Card — nudges back to Orca, not back to distraction -->
         <section id="restoreCard" class="floating-card restore-card">
           <div>
             <h2 class="floating-title">Run finished</h2>
             <div id="restoreSub" class="floating-sub">Ready in Orca</div>
           </div>
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <button id="focusAppBtn" type="button" class="btn btn-amber" style="width:100%;">Return to Orca</button>
+          <div class="restore-actions">
+            <button id="focusAppBtn" type="button" class="btn btn-amber">Return to Orca</button>
             <button id="returnNowBtn" type="button" class="restore-subtle-link hidden">or open site</button>
             <button id="stayBtn" type="button" class="restore-subtle-link hidden">Stay here</button>
           </div>
@@ -2046,12 +1999,8 @@
       </div>
     </aside>
 
-    <!-- ===============================================================
-         CENTERED PAPER WORKSPACE
-         =============================================================== -->
     <main class="paper-pane">
       <div class="content-col">
-        <!-- ANKI PANEL -->
         <section id="panel-anki" class="panel active" role="tabpanel" aria-labelledby="tab-anki">
           <div class="section-head">
             <h2 class="section-title">Flashcards</h2>
@@ -2059,7 +2008,6 @@
 
           <div class="spec-bar">
             <div class="spec-left">
-              <!-- Custom Emil-crafted Deck Dropdown -->
               <div class="deck-picker" id="deckPicker">
                 <button
                   id="deckTrigger"
@@ -2131,8 +2079,8 @@
             <div id="ankiSkeletonAction" class="skeleton-line" style="width: 100%; height: 48px; margin: 0;"></div>
 
             <div id="showAnswerWrap" class="action-row hidden">
-              <button id="showAnswerBtn" type="button" class="btn btn-amber" style="flex:1;">Show answer</button>
-              <button id="skipCardBtn" type="button" class="btn" style="min-height:48px;">Skip</button>
+              <button id="showAnswerBtn" type="button" class="btn btn-amber">Show answer</button>
+              <button id="skipCardBtn" type="button" class="btn">Skip</button>
             </div>
 
             <div id="rateWrap" class="rate-grid hidden">
@@ -2143,8 +2091,8 @@
             </div>
 
             <div id="ankiEmptyActions" class="action-row hidden">
-              <button id="emptyPrimaryBtn" type="button" class="btn btn-amber" style="flex:1;">Sync</button>
-              <button id="emptySecondaryBtn" type="button" class="btn hidden" style="min-height:48px;">Study all cards</button>
+              <button id="emptyPrimaryBtn" type="button" class="btn btn-amber">Sync</button>
+              <button id="emptySecondaryBtn" type="button" class="btn hidden">Study all cards</button>
             </div>
           </div>
 
@@ -2158,25 +2106,24 @@
           </div>
         </section>
 
-        <!-- SCRATCHPAD PANEL -->
         <section id="panel-scratchpad" class="panel" role="tabpanel" aria-labelledby="tab-scratchpad">
           <div class="section-head">
             <h2 class="section-title">Notes</h2>
           </div>
 
           <label for="padArea" class="sr-only">Scratchpad note</label>
-          <textarea id="padArea" class="pad-area" placeholder="Next prompt, open question, bug you spotted…"></textarea>
+          <textarea id="padArea" class="pad-area" placeholder="Next prompt, open question, a bug you spotted…"></textarea>
 
           <div class="action-row">
-            <button id="obsidianPadBtn" type="button" class="btn btn-amber" style="flex:1;">Append to Obsidian</button>
-            <button id="copyPadBtn" type="button" class="btn" style="min-height:48px;">
+            <button id="obsidianPadBtn" type="button" class="btn btn-amber">Append to Obsidian</button>
+            <button id="copyPadBtn" type="button" class="btn">
               <span id="copyIconSwap" class="icon-swap" data-swapped="false" aria-hidden="true">
                 <svg class="icon icon-base" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 <svg class="icon icon-alt" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
               </span>
               <span id="copyPadText">Copy</span>
             </button>
-            <button id="clearPadBtn" type="button" class="btn btn-ghost" style="min-height:48px;">Clear</button>
+            <button id="clearPadBtn" type="button" class="btn btn-ghost">Clear</button>
           </div>
 
           <div class="pad-meta">
@@ -2185,7 +2132,6 @@
           </div>
         </section>
 
-        <!-- REST PANEL — Slow Coherent Breathing Dial -->
         <section id="panel-rest" class="panel" role="tabpanel" aria-labelledby="tab-rest">
           <div class="section-head">
             <h2 class="section-title">Rest</h2>
@@ -2236,7 +2182,6 @@
           </div>
         </section>
 
-        <!-- SETTINGS PANEL -->
         <section id="panel-settings" class="panel" role="tabpanel" aria-labelledby="tab-settings">
           <div class="section-head">
             <h2 class="section-title">Settings</h2>
@@ -2251,34 +2196,34 @@
                     <span id="ankiAccountDot" class="sync-dot" aria-hidden="true"></span>
                     <span id="ankiAccountTitle">Not connected</span>
                   </div>
-                  <div id="ankiAccountDesc" class="spec-row-desc" style="margin-top:3px;">Sync directly with AnkiWeb without Anki Desktop.</div>
+                  <div id="ankiAccountDesc" class="spec-row-desc">Sync with AnkiWeb without Anki Desktop.</div>
                 </div>
               </div>
 
-              <form id="ankiLoginForm" class="hidden" style="display:flex;flex-direction:column;gap:12px;">
+              <form id="ankiLoginForm" class="anki-login-form hidden">
                 <div class="anki-account-fields">
                   <div class="anki-field">
-                    <label for="ankiEmailInput">AnkiWeb email</label>
-                    <input id="ankiEmailInput" type="text" class="anki-input" autocomplete="username" placeholder="you@example.com" required />
+                    <label for="ankiEmailInput">Email or username</label>
+                    <input id="ankiEmailInput" type="text" class="text-input" autocomplete="username" autocapitalize="off" spellcheck="false" required />
                   </div>
                   <div class="anki-field">
                     <label for="ankiPasswordInput">Password</label>
-                    <input id="ankiPasswordInput" type="password" class="anki-input" autocomplete="current-password" placeholder="••••••••" required />
+                    <input id="ankiPasswordInput" type="password" class="text-input" autocomplete="current-password" required />
                   </div>
                 </div>
 
                 <details class="anki-advanced">
-                  <summary>Custom sync server (optional)</summary>
+                  <summary>Self-hosted sync server</summary>
                   <div class="anki-field">
-                    <label for="ankiEndpointInput">Sync server URL</label>
-                    <input id="ankiEndpointInput" type="url" class="anki-input" placeholder="Leave blank for AnkiWeb, or https://sync.example.com/" />
+                    <label for="ankiEndpointInput">Server URL (leave blank for AnkiWeb)</label>
+                    <input id="ankiEndpointInput" type="url" class="text-input" placeholder="https://sync.example.com/" autocapitalize="off" spellcheck="false" />
                   </div>
                 </details>
 
                 <div class="anki-account-actions">
-                  <button id="ankiLoginBtn" type="submit" class="btn btn-amber">Sign in &amp; sync</button>
+                  <button id="ankiLoginBtn" type="submit" class="btn btn-amber">Sign in</button>
                 </div>
-                <p class="anki-account-note">Password is used once to obtain a sync token and is never saved to disk. Uses an isolated local cache so Anki Desktop stays untouched.</p>
+                <p class="anki-account-note">Your password is sent once to get a sync key and is never stored. Agent Focus keeps its own copy of your collection, separate from Anki Desktop’s.</p>
               </form>
 
               <div id="ankiSignedInActions" class="anki-account-actions hidden">
@@ -2301,8 +2246,8 @@
             </label>
             <label class="spec-row clickable" for="toggleChime">
               <div>
-                <div class="spec-row-title">Tactile sounds &amp; completion bell</div>
-                <div class="spec-row-desc">Warm chimes for card ratings, milestones, and finished runs.</div>
+                <div class="spec-row-title">Sounds</div>
+                <div class="spec-row-desc">Soft chimes when you rate a card or a run finishes.</div>
               </div>
               <input type="checkbox" id="toggleChime" class="switch" />
             </label>
@@ -2329,7 +2274,7 @@
             <h3 class="spec-group-title">Blocked sites</h3>
             <form id="addDomainForm" class="domain-form">
               <label for="addDomainInput" class="sr-only">Site to block</label>
-              <input id="addDomainInput" class="domain-input" placeholder="spiegel.de or mail.proton.me" autocomplete="off" spellcheck="false" />
+              <input id="addDomainInput" class="text-input" placeholder="reddit.com" autocomplete="off" autocapitalize="off" spellcheck="false" />
               <button type="submit" class="btn">Add</button>
             </form>
             <div id="domainsList" class="domain-chips"></div>
@@ -2338,14 +2283,11 @@
       </div>
     </main>
 
-    <!-- ===============================================================
-         RIGHT TASK SWITCHER RAIL
-         =============================================================== -->
     <aside class="nav-rail">
       <div class="nav-capsule">
-        <nav class="tabs" id="tabBar" role="tablist" aria-label="Workspace modes">
-          <button id="tab-anki" type="button" class="tab-btn active" data-tab="anki" role="tab" aria-selected="true" aria-controls="panel-anki" tabindex="0">Anki</button>
-          <button id="tab-scratchpad" type="button" class="tab-btn" data-tab="scratchpad" role="tab" aria-selected="false" aria-controls="panel-scratchpad" tabindex="-1">Scratchpad</button>
+        <nav class="tabs" id="tabBar" role="tablist" aria-label="Sections">
+          <button id="tab-anki" type="button" class="tab-btn active" data-tab="anki" role="tab" aria-selected="true" aria-controls="panel-anki" tabindex="0">Flashcards</button>
+          <button id="tab-scratchpad" type="button" class="tab-btn" data-tab="scratchpad" role="tab" aria-selected="false" aria-controls="panel-scratchpad" tabindex="-1">Notes</button>
           <button id="tab-rest" type="button" class="tab-btn" data-tab="rest" role="tab" aria-selected="false" aria-controls="panel-rest" tabindex="-1">Rest</button>
           <button id="tab-settings" type="button" class="tab-btn" data-tab="settings" role="tab" aria-selected="false" aria-controls="panel-settings" tabindex="-1">Settings</button>
         </nav>
@@ -2353,13 +2295,11 @@
     </aside>
   </div>
 
-  <!-- Undo Toast -->
   <div id="undoToast" class="toast" role="status" aria-live="polite" data-open="false">
     <span id="undoText">Cleared</span>
     <button id="undoActionBtn" type="button" class="toast-undo">Undo</button>
   </div>
 
-  <!-- Modal Image Lightbox -->
   <div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-label="Enlarged flashcard image" data-open="false">
     <div class="lightbox-inner">
       <img id="lightboxImg" src="" alt="" />
@@ -2371,20 +2311,19 @@
     const params = new URLSearchParams(window.location.search);
     const fromUrl = params.get("from") || "";
     const fromDomain = params.get("domain") || "";
-    const interceptedAtParam = Number(params.get("t") || 0);
+    const intercepted = Boolean(fromUrl && fromDomain);
+
+    const $ = (id) => document.getElementById(id);
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
     let state = null;
     let wasBlocking = Boolean(fromUrl);
     let userEngaged = false;
     let restoreCountdownTimer = null;
-    let restoreSecondsLeft = 0;
-
-    let bypassCooldownTotal = 30;
     let bypassUnlockedAnnounced = false;
-    let interceptStartSec = interceptedAtParam || Math.floor(Date.now() / 1000);
+    let interceptStartSec = Number(params.get("t") || 0) || Math.floor(Date.now() / 1000);
     const BYPASS_CIRC = 2 * Math.PI * 9;
 
-    // Anki state
     let ankiCards = [];
     let ankiIndex = 0;
     let ankiRevealed = false;
@@ -2392,25 +2331,22 @@
     let ankiStudyMode = localStorage.getItem("agentFocusStudyMode") || "due";
     let ankiData = null;
     let ankiLoadError = false;
-    let sessionStreak = 0;
+    let ankiHasPendingSync = false;
+    let sessionCombo = 0;
 
-    // Custom Dropdown state
     let deckOptions = [];
     let deckMenuOpen = false;
     let deckHighlightIdx = 0;
-
-    // Modal focus return
     let lightboxTriggerEl = null;
-
-    // Undo toast
     let undoTimer = null;
     let undoHandler = null;
 
-    const $ = (id) => document.getElementById(id);
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    function postJSON(path, body = {}) {
+      return fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     }
 
     function announce(msg) {
@@ -2419,161 +2355,119 @@
       requestAnimationFrame(() => { el.textContent = msg; });
     }
 
-    // =========================================================================
-    // DOPAMINE TACTILE SOUND ENGINE (Zero-dependency Web Audio synth)
-    // =========================================================================
-    const SFX = (() => {
-      let ctx = null;
-      function getCtx() {
-        if (!state?.config?.completion_chime && state !== null) return null;
-        try {
-          if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-          if (ctx.state === "suspended") ctx.resume();
-          return ctx;
-        } catch (_) {
-          return null;
-        }
+    function returnAppName() {
+      return state?.config?.return_app || "Orca";
+    }
+
+    // Each note: [frequency Hz, start s, duration s, peak gain, wave, octave overtone gain].
+    const SOUNDS = {
+      tick: [[920, 0, 0.022, 0.028, "sine"]],
+      flip: [[310, 0, 0.045, 0.055, "triangle"], [640, 0.012, 0.032, 0.025, "sine"]],
+      again: [[330, 0, 0.09, 0.05, "triangle"], [277.18, 0.075, 0.14, 0.045, "triangle"]],
+      hard: [[392, 0, 0.14, 0.055, "triangle", 0.25]],
+      good: [[523.25, 0, 0.18, 0.065, "triangle", 0.35], [783.99, 0.065, 0.26, 0.072, "triangle", 0.35]],
+      easy: [
+        [523.25, 0, 0.16, 0.055, "triangle", 0.4],
+        [659.25, 0.05, 0.18, 0.06, "triangle", 0.4],
+        [783.99, 0.1, 0.22, 0.065, "triangle", 0.4],
+        [1046.5, 0.15, 0.34, 0.06, "sine", 0.25],
+      ],
+      celebrate: [523.25, 659.25, 783.99, 987.77, 1174.66].map((f, i) => [f, i * 0.055, 0.45, 0.055, "triangle", 0.3]),
+      confirm: [[659.25, 0, 0.12, 0.045, "sine", 0.2], [880, 0.055, 0.2, 0.05, "sine", 0.2]],
+      agentDone: [[587.33, 0, 0.42, 0.06, "sine", 0.25], [880, 0.13, 0.62, 0.065, "sine", 0.2]],
+      inhale: [[349.23, 0, 0.9, 0.032, "sine", 0.15]],
+      exhale: [[261.63, 0, 1.1, 0.03, "sine", 0.12]],
+    };
+    let audioCtx = null;
+
+    function playTone(type, freq, t, duration, peak, attack) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(peak, t + attack);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + duration + 0.02);
+    }
+
+    function sfx(name) {
+      if (state && !state.config.completion_chime) return;
+      audioCtx ??= new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      const now = audioCtx.currentTime;
+      for (const [freq, start, duration, peak, type, overtone = 0] of SOUNDS[name]) {
+        playTone(type, freq, now + start, duration, peak, 0.009);
+        if (overtone) playTone("sine", freq * 2, now + start, duration * 0.55, peak * overtone, 0.006);
       }
+    }
 
-      function tone(c, freq, startOffset, duration, vol, type = "triangle", overtone = 0) {
-        const t = c.currentTime + startOffset;
-        const osc = c.createOscillator();
-        const gain = c.createGain();
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, t);
-        gain.gain.setValueAtTime(0.0001, t);
-        gain.gain.exponentialRampToValueAtTime(vol, t + 0.009);
-        gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
-        osc.connect(gain);
-        gain.connect(c.destination);
-        osc.start(t);
-        osc.stop(t + duration + 0.02);
-
-        if (overtone > 0) {
-          const osc2 = c.createOscillator();
-          const gain2 = c.createGain();
-          osc2.type = "sine";
-          osc2.frequency.setValueAtTime(freq * 2, t);
-          gain2.gain.setValueAtTime(0.0001, t);
-          gain2.gain.exponentialRampToValueAtTime(vol * overtone, t + 0.006);
-          gain2.gain.exponentialRampToValueAtTime(0.0001, t + duration * 0.55);
-          osc2.connect(gain2);
-          gain2.connect(c.destination);
-          osc2.start(t);
-          osc2.stop(t + duration * 0.6);
-        }
-      }
-
-      return {
-        tick() {
-          const c = getCtx();
-          if (!c) return;
-          tone(c, 920, 0, 0.022, 0.028, "sine");
-        },
-        flip() {
-          const c = getCtx();
-          if (!c) return;
-          // Crisp cotton-card woody flip
-          tone(c, 310, 0, 0.045, 0.055, "triangle");
-          tone(c, 640, 0.012, 0.032, 0.025, "sine");
-        },
-        rateAgain() {
-          const c = getCtx();
-          if (!c) return;
-          tone(c, 330, 0, 0.09, 0.05, "triangle");
-          tone(c, 277.18, 0.075, 0.14, 0.045, "triangle");
-        },
-        rateHard() {
-          const c = getCtx();
-          if (!c) return;
-          tone(c, 392.0, 0, 0.14, 0.055, "triangle", 0.25);
-        },
-        rateGood() {
-          const c = getCtx();
-          if (!c) return;
-          // Warm ascending marimba fifth (C5 -> G5)
-          tone(c, 523.25, 0, 0.18, 0.065, "triangle", 0.35);
-          tone(c, 783.99, 0.065, 0.26, 0.072, "triangle", 0.35);
-        },
-        rateEasy() {
-          const c = getCtx();
-          if (!c) return;
-          // Sparkling major triad arpeggio (C5 -> E5 -> G5 -> C6)
-          tone(c, 523.25, 0, 0.16, 0.055, "triangle", 0.4);
-          tone(c, 659.25, 0.05, 0.18, 0.06, "triangle", 0.4);
-          tone(c, 783.99, 0.10, 0.22, 0.065, "triangle", 0.4);
-          tone(c, 1046.5, 0.15, 0.34, 0.06, "sine", 0.25);
-        },
-        celebrate() {
-          const c = getCtx();
-          if (!c) return;
-          // Lush major-9th streak / deck cleared chord
-          [523.25, 659.25, 783.99, 987.77, 1174.66].forEach((f, i) => {
-            tone(c, f, i * 0.055, 0.45, 0.055, "triangle", 0.3);
-          });
-        },
-        confirm() {
-          const c = getCtx();
-          if (!c) return;
-          tone(c, 659.25, 0, 0.12, 0.045, "sine", 0.2);
-          tone(c, 880.0, 0.055, 0.20, 0.05, "sine", 0.2);
-        },
-        agentDone() {
-          const c = getCtx();
-          if (!c) return;
-          tone(c, 587.33, 0, 0.42, 0.06, "sine", 0.25);
-          tone(c, 880.0, 0.13, 0.62, 0.065, "sine", 0.2);
-        },
-        breath(phaseName) {
-          if (!breathAudioOn) return;
-          const c = getCtx();
-          if (!c) return;
-          if (phaseName === "Inhale") tone(c, 349.23, 0, 0.9, 0.032, "sine", 0.15);
-          else if (phaseName === "Exhale") tone(c, 261.63, 0, 1.1, 0.03, "sine", 0.12);
-        },
-      };
-    })();
-
-    // =========================================================================
-    // JOYFUL TACTILE PARTICLE BURST (GPU transform + opacity via WAAPI)
-    // =========================================================================
-    function emitSparks(originEl, palette, count = 12) {
+    function emitSparks(originEl, palette, count) {
       if (prefersReducedMotion.matches || !originEl) return;
       const rect = originEl.getBoundingClientRect();
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
-      const layer = $("sparkLayer");
-
       for (let i = 0; i < count; i++) {
         const dot = document.createElement("span");
-        dot.className = "spark";
         const size = 4 + Math.random() * 4;
-        dot.style.width = `${size}px`;
-        dot.style.height = `${size}px`;
-        dot.style.left = `${cx - size / 2}px`;
-        dot.style.top = `${cy - size / 2}px`;
-        dot.style.background = palette[i % palette.length];
-        layer.appendChild(dot);
+        dot.className = "spark";
+        Object.assign(dot.style, {
+          width: `${size}px`,
+          height: `${size}px`,
+          left: `${cx - size / 2}px`,
+          top: `${cy - size / 2}px`,
+          background: palette[i % palette.length],
+        });
+        $("sparkLayer").appendChild(dot);
 
         const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.45;
         const dist = 34 + Math.random() * 46;
-        const dx = Math.cos(angle) * dist;
-        const dy = Math.sin(angle) * dist - 14;
-
-        const anim = dot.animate(
+        dot.animate(
           [
             { transform: "translate(0, 0) scale(1)", opacity: 1 },
-            { transform: `translate(${dx}px, ${dy}px) scale(0.35)`, opacity: 0 },
+            { transform: `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist - 14}px) scale(0.35)`, opacity: 0 },
           ],
           { duration: 420 + Math.random() * 140, easing: "cubic-bezier(0.165, 0.84, 0.44, 1)", fill: "forwards" }
-        );
-        anim.onfinish = () => dot.remove();
+        ).onfinish = () => dot.remove();
       }
     }
 
-    // --- Undo Toast ---
+    function emitXpFloat(originEl, text, color) {
+      if (prefersReducedMotion.matches || !originEl) return;
+      const rect = originEl.getBoundingClientRect();
+      const el = document.createElement("div");
+      el.className = "xp-float";
+      el.textContent = text;
+      Object.assign(el.style, { color, left: `${rect.left + rect.width / 2}px`, top: `${rect.top - 8}px` });
+      document.body.appendChild(el);
+      el.animate(
+        [
+          { transform: "translate(-50%, 4px) scale(0.92)", opacity: 0 },
+          { transform: "translate(-50%, -10px) scale(1)", opacity: 1, offset: 0.22 },
+          { transform: "translate(-50%, -28px) scale(0.98)", opacity: 0 },
+        ],
+        { duration: 760, easing: "cubic-bezier(0.165, 0.84, 0.44, 1)", fill: "forwards" }
+      ).onfinish = () => el.remove();
+    }
+
+    function restartAnimation(el, cls) {
+      el.classList.remove(cls);
+      void el.offsetWidth;
+      el.classList.add(cls);
+    }
+
+    function flashSheetRim(cls) {
+      if (prefersReducedMotion.matches) return;
+      const sheet = $("ankiSheet");
+      sheet.classList.remove("flash-good", "flash-easy");
+      restartAnimation(sheet, cls);
+      setTimeout(() => sheet.classList.remove(cls), 360);
+    }
+
     function showUndo(message, onUndo) {
-      if (undoTimer) clearTimeout(undoTimer);
+      clearTimeout(undoTimer);
       undoHandler = onUndo;
       $("undoText").textContent = message;
       $("undoToast").setAttribute("data-open", "true");
@@ -2584,21 +2478,19 @@
     }
 
     $("undoActionBtn").addEventListener("click", () => {
-      SFX.tick();
-      if (undoTimer) clearTimeout(undoTimer);
+      sfx("tick");
+      clearTimeout(undoTimer);
       $("undoToast").setAttribute("data-open", "false");
-      if (undoHandler) {
-        const fn = undoHandler;
-        undoHandler = null;
-        fn();
-      }
+      const fn = undoHandler;
+      undoHandler = null;
+      fn?.();
     });
 
-    // --- Accessible Tablist ---
+    // Tabs
     const tabButtons = [...document.querySelectorAll('[role="tab"]')];
 
     function setActiveTab(name, moveFocus = false, playSound = false) {
-      if (playSound) SFX.tick();
+      if (playSound) sfx("tick");
       tabButtons.forEach((b) => {
         const active = b.dataset.tab === name;
         b.classList.toggle("active", active);
@@ -2617,369 +2509,286 @@
     tabButtons.forEach((btn, idx) => {
       btn.addEventListener("click", () => setActiveTab(btn.dataset.tab, false, true));
       btn.addEventListener("keydown", (e) => {
-        let targetIdx = null;
-        if (e.key === "ArrowRight" || e.key === "ArrowDown") targetIdx = (idx + 1) % tabButtons.length;
-        else if (e.key === "ArrowLeft" || e.key === "ArrowUp") targetIdx = (idx - 1 + tabButtons.length) % tabButtons.length;
-        else if (e.key === "Home") targetIdx = 0;
-        else if (e.key === "End") targetIdx = tabButtons.length - 1;
-        if (targetIdx !== null) {
-          e.preventDefault();
-          setActiveTab(tabButtons[targetIdx].dataset.tab, true, false);
-        }
+        const last = tabButtons.length - 1;
+        const target = {
+          ArrowRight: idx === last ? 0 : idx + 1,
+          ArrowDown: idx === last ? 0 : idx + 1,
+          ArrowLeft: idx === 0 ? last : idx - 1,
+          ArrowUp: idx === 0 ? last : idx - 1,
+          Home: 0,
+          End: last,
+        }[e.key];
+        if (target === undefined) return;
+        e.preventDefault();
+        setActiveTab(tabButtons[target].dataset.tab, true, false);
       });
     });
 
-    // --- 30-Second Bypass Gate ---
+    // Intercepted site and the bypass gate
     function bypassMinutesLabel() {
-      const secs = state?.config?.default_bypass_seconds || 120;
-      return `${Math.max(1, Math.round(secs / 60))} min`;
+      return `${Math.max(1, Math.round((state?.config?.default_bypass_seconds || 120) / 60))} min`;
     }
 
     function updateInterceptCopy() {
-      if (!fromDomain) return;
       $("interceptTitle").textContent = `${fromDomain} is blocked`;
-      const autoOn = state ? Boolean(state.config.auto_restore) : true;
-      $("interceptSub").textContent = autoOn ? "Reopens when all runs finish" : "Agent still running";
+      const autoRestore = state ? state.config.auto_restore : true;
+      $("interceptSub").textContent = autoRestore ? "Reopens when all runs finish" : "Agent still running";
     }
 
     function updateBypassGate() {
-      if (!fromDomain || !fromUrl) return;
       const btn = $("bypassBtn");
       const label = $("bypassBtnLabel");
-      const ringSvg = $("bypassRingSvg");
-      const circle = $("bypassRingCircle");
+      const total = state?.config?.bypass_cooldown_seconds ?? 30;
+      const remaining = Math.max(0, Math.ceil(total - (Date.now() / 1000 - interceptStartSec)));
+      const locked = remaining > 0;
 
-      const total = state?.config?.bypass_cooldown_seconds ?? bypassCooldownTotal;
-      const elapsedLocal = Date.now() / 1000 - interceptStartSec;
-      const remaining = Math.max(0, Math.ceil(total - elapsedLocal));
-
-      if (remaining > 0) {
-        btn.disabled = true;
-        btn.classList.remove("unlocked");
+      btn.disabled = locked;
+      btn.classList.toggle("unlocked", !locked);
+      $("bypassRingSvg").classList.toggle("hidden", !locked);
+      if (locked) {
         btn.setAttribute("aria-label", `Temporary bypass locked for ${total} seconds`);
-        ringSvg.classList.remove("hidden");
-        const frac = Math.min(1, Math.max(0, remaining / Math.max(1, total)));
-        circle.style.strokeDashoffset = String(BYPASS_CIRC * (1 - frac));
+        $("bypassRingCircle").style.strokeDashoffset = String(BYPASS_CIRC * (1 - Math.min(1, remaining / Math.max(1, total))));
         label.textContent = `Available in ${remaining}s`;
-      } else {
-        const text = `Open for ${bypassMinutesLabel()}`;
-        btn.disabled = false;
-        btn.classList.add("unlocked");
-        btn.setAttribute("aria-label", `${text} for ${fromDomain}`);
-        ringSvg.classList.add("hidden");
-        label.textContent = text;
-        if (!bypassUnlockedAnnounced) {
-          bypassUnlockedAnnounced = true;
-          announce(`Temporary bypass is now available for ${fromDomain}.`);
-        }
+        return;
+      }
+      const text = `Open for ${bypassMinutesLabel()}`;
+      btn.setAttribute("aria-label", `${text} for ${fromDomain}`);
+      label.textContent = text;
+      if (!bypassUnlockedAnnounced) {
+        bypassUnlockedAnnounced = true;
+        announce(`Temporary bypass is now available for ${fromDomain}.`);
       }
     }
 
-    if (fromDomain && fromUrl) {
+    if (intercepted) {
       updateInterceptCopy();
       $("interceptCard").classList.add("visible");
-      $("returnNowBtn").textContent = `or open ${fromDomain}`;
       updateBypassGate();
     }
-
-    $("focusAppBtn").addEventListener("click", async () => {
-      SFX.confirm();
-      cancelRestoreCountdown();
-      const app = state?.config?.return_app || "Orca";
-      await fetch("/api/focus-app", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ app }),
-      });
-    });
+    if (fromUrl) $("returnNowBtn").textContent = `or open ${fromDomain || "site"}`;
 
     $("bypassBtn").addEventListener("click", async () => {
-      if (!fromDomain || $("bypassBtn").disabled) return;
-      SFX.tick();
-      const secs = state?.config?.default_bypass_seconds || 120;
-      const res = await fetch("/api/bypass", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domain: fromDomain, seconds: secs }),
-      });
+      if (!intercepted || $("bypassBtn").disabled) return;
+      sfx("tick");
+      const res = await postJSON("/api/bypass", { domain: fromDomain, seconds: state?.config?.default_bypass_seconds || 120 });
       if (res.ok) {
         window.location.href = fromUrl;
-      } else {
-        const data = await res.json().catch(() => ({}));
-        if (typeof data.remaining === "number" && data.remaining > 0) {
-          interceptStartSec = Date.now() / 1000 - ((state?.config?.bypass_cooldown_seconds || 30) - data.remaining);
-          updateBypassGate();
-        }
+        return;
       }
+      const data = await res.json().catch(() => ({}));
+      if (data.remaining > 0) {
+        interceptStartSec = Date.now() / 1000 - ((state?.config?.bypass_cooldown_seconds ?? 30) - data.remaining);
+        updateBypassGate();
+      }
+    });
+
+    // Run finished card
+    function cancelRestoreCountdown() {
+      clearInterval(restoreCountdownTimer);
+      restoreCountdownTimer = null;
+    }
+
+    function triggerCompletionRestore() {
+      sfx("agentDone");
+      const app = returnAppName();
+      announce(`Agent run finished. Ready in ${app}.`);
+      $("focusAppBtn").textContent = `Return to ${app}`;
+      $("restoreSub").textContent = `Ready in ${app}`;
+      $("restoreCard").classList.add("visible");
+      $("interceptCard").classList.remove("visible");
+      $("returnNowBtn").classList.toggle("hidden", !fromUrl);
+
+      const autoRestore = Boolean(state.config.auto_restore && fromUrl) && !userEngaged;
+      $("stayBtn").classList.toggle("hidden", !autoRestore);
+      if (!autoRestore) return;
+
+      let secondsLeft = 3;
+      const showCountdown = () => { $("restoreSub").textContent = `Opening ${fromDomain || "site"} in ${secondsLeft}s`; };
+      showCountdown();
+      cancelRestoreCountdown();
+      restoreCountdownTimer = setInterval(() => {
+        secondsLeft -= 1;
+        if (secondsLeft > 0) {
+          showCountdown();
+          return;
+        }
+        cancelRestoreCountdown();
+        window.location.href = fromUrl;
+      }, 1000);
+    }
+
+    $("focusAppBtn").addEventListener("click", () => {
+      sfx("confirm");
+      cancelRestoreCountdown();
+      postJSON("/api/focus-app", { app: returnAppName() });
     });
 
     $("returnNowBtn").addEventListener("click", () => {
       cancelRestoreCountdown();
-      if (fromUrl) window.location.href = fromUrl;
+      window.location.href = fromUrl;
     });
 
     $("stayBtn").addEventListener("click", () => {
-      SFX.tick();
+      sfx("tick");
       cancelRestoreCountdown();
       $("stayBtn").classList.add("hidden");
-      $("restoreSub").textContent = `Ready in ${state?.config?.return_app || "Orca"}`;
+      $("restoreSub").textContent = `Ready in ${returnAppName()}`;
     });
 
-    function cancelRestoreCountdown() {
-      if (restoreCountdownTimer) {
-        clearInterval(restoreCountdownTimer);
-        restoreCountdownTimer = null;
-      }
-    }
-
-    function triggerCompletionRestore() {
-      SFX.agentDone();
-      const appName = state?.config?.return_app || "Orca";
-      announce(`Agent run finished. Ready in ${appName}.`);
-      $("focusAppBtn").textContent = `Return to ${appName}`;
-      $("restoreSub").textContent = `Ready in ${appName}`;
-      $("restoreCard").classList.add("visible");
-      $("interceptCard").classList.remove("visible");
-
-      if (fromUrl) {
-        $("returnNowBtn").textContent = `or open ${fromDomain || "site"}`;
-        $("returnNowBtn").classList.remove("hidden");
-      } else {
-        $("returnNowBtn").classList.add("hidden");
-      }
-
-      const shouldAuto = Boolean(state?.config?.auto_restore) && Boolean(fromUrl);
-      if (shouldAuto && !userEngaged) {
-        restoreSecondsLeft = 3;
-        $("stayBtn").classList.remove("hidden");
-        $("restoreSub").textContent = `Opening ${fromDomain || "site"} in ${restoreSecondsLeft}s`;
-        cancelRestoreCountdown();
-        restoreCountdownTimer = setInterval(() => {
-          restoreSecondsLeft -= 1;
-          if (restoreSecondsLeft <= 0) {
-            cancelRestoreCountdown();
-            window.location.href = fromUrl;
-          } else {
-            $("restoreSub").textContent = `Opening ${fromDomain || "site"} in ${restoreSecondsLeft}s`;
-          }
-        }, 1000);
-      } else {
-        $("stayBtn").classList.add("hidden");
-      }
-    }
-
-    $("pauseBtn").addEventListener("click", async () => {
-      SFX.tick();
-      const isPaused = (state?.paused_remaining || 0) > 0;
-      await fetch("/api/pause", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seconds: isPaused ? 0 : 600 }),
-      });
+    $("pauseBtn").addEventListener("click", () => {
+      sfx("tick");
+      postJSON("/api/pause", { seconds: state?.paused_remaining > 0 ? 0 : 600 });
     });
 
     $("clearAgentsBtn").addEventListener("click", async () => {
-      SFX.tick();
-      const prevAgents = state?.agents ? [...state.agents] : [];
-      await fetch("/api/agent/clear", { method: "POST" });
-      if (prevAgents.length) {
-        showUndo("Active runs cleared", async () => {
-          for (const a of prevAgents) {
-            await fetch("/api/agent/start", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ session_id: a.session_id, agent: a.agent, pid: a.pid || 0, cwd: a.cwd || "" }),
-            });
-          }
-        });
-      }
+      sfx("tick");
+      const prevAgents = [...(state?.agents || [])];
+      await postJSON("/api/agent/clear");
+      if (!prevAgents.length) return;
+      showUndo("Active runs cleared", async () => {
+        for (const a of prevAgents) {
+          await postJSON("/api/agent/start", { session_id: a.session_id, agent: a.agent, pid: a.pid || 0, cwd: a.cwd || "" });
+        }
+      });
     });
 
+    // Left rail state
     function formatElapsed(sec) {
       const s = Math.max(0, Math.floor(sec));
-      const m = Math.floor(s / 60);
-      const r = s % 60;
-      return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+      return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
     }
 
     function prettyAgent(name) {
-      return ({ claude: "Claude Code", codex: "Codex", antigravity: "Antigravity" })[name] || name;
+      return { claude: "Claude Code", codex: "Codex", antigravity: "Antigravity" }[name] || name;
     }
 
     function updateClockVisual() {
+      if (!state) return;
       const clock = $("stageClock");
       const unit = $("clockUnit");
-      if (!state) return;
-
+      let text = "00:00";
+      let unitText = "";
       if (state.paused_remaining > 0) {
-        clock.textContent = formatElapsed(state.paused_remaining);
-        unit.textContent = "left";
-        unit.classList.remove("hidden");
+        text = formatElapsed(state.paused_remaining);
+        unitText = "left";
+      } else if (state.blocking && state.earliest_start) {
+        text = formatElapsed(Date.now() / 1000 - state.earliest_start);
+        unitText = "elapsed";
       } else if (state.blocking) {
-        if (state.earliest_start) {
-          clock.textContent = formatElapsed(Math.max(0, Date.now() / 1000 - state.earliest_start));
-          unit.textContent = "elapsed";
-          unit.classList.remove("hidden");
-        } else {
-          clock.textContent = "--:--";
-          unit.classList.add("hidden");
-        }
-      } else {
-        clock.textContent = "00:00";
-        unit.classList.add("hidden");
+        text = "--:--";
       }
+      clock.textContent = text;
+      unit.textContent = unitText;
+      unit.classList.toggle("hidden", !unitText);
+    }
+
+    function runSummary(agents) {
+      if (agents.length === 1) {
+        const a = agents[0];
+        return [`${prettyAgent(a.agent)} is working`, a.project ? `In ${a.project}.` : ""];
+      }
+      const counts = {};
+      agents.forEach((a) => {
+        const name = prettyAgent(a.agent);
+        counts[name] = (counts[name] || 0) + 1;
+      });
+      const entries = Object.entries(counts);
+      if (entries.length === 1) {
+        const [name, cnt] = entries[0];
+        return [`${cnt} ${name} runs`, [...new Set(agents.map((a) => a.project).filter(Boolean))].join(", ")];
+      }
+      return [`${agents.length} agents working`, entries.map(([n, c]) => (c > 1 ? `${c} ${n}` : n)).join(", ")];
     }
 
     function renderState(next) {
       const prevBlocking = state ? state.blocking : wasBlocking;
       state = next;
-      bypassCooldownTotal = state.config.bypass_cooldown_seconds ?? 30;
-      $("focusAppBtn").textContent = `Return to ${state.config.return_app || "Orca"}`;
+      let headline;
+      let detail;
 
-      const dot = $("clockDot");
-      const headline = $("stageHeadline");
-      const detail = $("stageDetail");
-
-      dot.classList.remove("idle", "paused");
+      $("clockDot").classList.toggle("paused", state.paused_remaining > 0);
+      $("clockDot").classList.toggle("idle", state.paused_remaining === 0 && !state.blocking);
+      $("pauseBtn").textContent = state.paused_remaining > 0 ? "Resume" : "Pause 10 min";
+      $("focusAppBtn").textContent = `Return to ${returnAppName()}`;
 
       if (state.paused_remaining > 0) {
-        dot.classList.add("paused");
-        const mins = Math.ceil(state.paused_remaining / 60);
-        headline.textContent = "Paused";
-        detail.textContent = `Blocked sites open normally for ${mins} min.`;
-        detail.classList.remove("hidden");
-        $("pauseBtn").textContent = "Resume";
+        headline = "Paused";
+        detail = `Blocked sites open normally for ${Math.ceil(state.paused_remaining / 60)} min.`;
       } else if (state.blocking) {
-        $("pauseBtn").textContent = "Pause 10 min";
-        if (state.active_count === 1) {
-          const a = state.agents[0];
-          headline.textContent = `${prettyAgent(a.agent)} is working`;
-          if (a.project) {
-            detail.textContent = `In ${a.project}.`;
-            detail.classList.remove("hidden");
-          } else {
-            detail.classList.add("hidden");
-          }
-        } else if (state.active_count > 1) {
-          const counts = {};
-          state.agents.forEach((a) => {
-            const name = prettyAgent(a.agent);
-            counts[name] = (counts[name] || 0) + 1;
-          });
-          const entries = Object.entries(counts);
-          if (entries.length === 1) {
-            const [name, cnt] = entries[0];
-            headline.textContent = `${cnt} ${name} runs`;
-            const projects = [...new Set(state.agents.map((a) => a.project).filter(Boolean))];
-            if (projects.length) {
-              detail.textContent = projects.join(", ");
-              detail.classList.remove("hidden");
-            } else {
-              detail.classList.add("hidden");
-            }
-          } else {
-            headline.textContent = `${state.active_count} agents working`;
-            detail.textContent = entries.map(([n, c]) => (c > 1 ? `${c} ${n}` : n)).join(", ");
-            detail.classList.remove("hidden");
-          }
-        } else {
-          headline.textContent = "Always-block is on";
-          detail.textContent = "Blocked sites redirect here until you turn it off.";
-          detail.classList.remove("hidden");
-        }
+        [headline, detail] = state.active_count > 0
+          ? runSummary(state.agents)
+          : ["Always-block is on", "Blocked sites redirect here until you turn it off."];
         cancelRestoreCountdown();
         $("restoreCard").classList.remove("visible");
-        if (fromDomain && fromUrl) {
+        if (intercepted) {
           updateInterceptCopy();
           $("interceptCard").classList.add("visible");
           updateBypassGate();
         }
       } else {
-        dot.classList.add("idle");
-        $("pauseBtn").textContent = "Pause 10 min";
-        headline.textContent = "Your turn";
-        detail.textContent = "Sites are open. Blocking starts with your next prompt.";
-        detail.classList.remove("hidden");
-        if (prevBlocking && !state.blocking) {
-          triggerCompletionRestore();
-        }
+        headline = "Your turn";
+        detail = "Sites are open. Blocking starts with your next prompt.";
+        if (prevBlocking) triggerCompletionRestore();
       }
+      $("stageHeadline").textContent = headline;
+      $("stageDetail").textContent = detail;
+      $("stageDetail").classList.toggle("hidden", !detail);
 
       updateClockVisual();
       wasBlocking = state.blocking;
       $("clearAgentsBtn").classList.toggle("hidden", state.active_count === 0);
 
       const caught = state.intercept_count_today || 0;
-      if (caught > 0) {
-        $("stageCaught").textContent = `${caught} blocked today`;
-        $("stageCaught").classList.remove("hidden");
-      } else {
-        $("stageCaught").classList.add("hidden");
-      }
+      $("stageCaught").textContent = `${caught} blocked today`;
+      $("stageCaught").classList.toggle("hidden", caught === 0);
 
       $("toggleAutoRestore").checked = Boolean(state.config.auto_restore);
       $("toggleChime").checked = Boolean(state.config.completion_chime);
       $("toggleManualFocus").checked = Boolean(state.manual_focus);
 
-      const obsConfigured = Boolean(state.config.obsidian_configured);
-      $("obsidianPadBtn").classList.toggle("hidden", !obsConfigured);
-      $("obsidianMetaPath").textContent = obsConfigured
-        ? `${state.config.obsidian_label} · ⌘↩ to append`
-        : "Saved locally";
+      const obsidian = Boolean(state.config.obsidian_configured);
+      $("obsidianPadBtn").classList.toggle("hidden", !obsidian);
+      $("obsidianMetaPath").textContent = obsidian ? `${state.config.obsidian_label} · ⌘↩ to append` : "Saved locally";
 
-      const agentsEl = $("activeAgentsList");
-      if (!state.agents.length) {
-        agentsEl.innerHTML = '<div class="spec-row"><span class="spec-row-desc">None running</span></div>';
-      } else {
-        agentsEl.innerHTML = state.agents.map((a) => {
-          const elapsed = formatElapsed(Date.now() / 1000 - a.started_at);
+      $("activeAgentsList").innerHTML = state.agents.length
+        ? state.agents.map((a) => {
           const proj = a.project ? ` in ${escapeHtml(a.project)}` : "";
-          return `<div class="spec-row"><span class="spec-row-title">${escapeHtml(prettyAgent(a.agent))}${proj}</span><span class="tabular mono-path" style="color:var(--ink-11)">${elapsed}</span></div>`;
-        }).join("");
-      }
+          return `<div class="spec-row"><span class="spec-row-title">${escapeHtml(prettyAgent(a.agent))}${proj}</span><span class="tabular mono-path">${formatElapsed(Date.now() / 1000 - a.started_at)}</span></div>`;
+        }).join("")
+        : '<div class="spec-row"><span class="spec-row-desc">None running</span></div>';
 
       const bypassEntries = Object.entries(state.bypasses || {});
       $("bypassesBox").classList.toggle("hidden", bypassEntries.length === 0);
       $("bypassesList").innerHTML = bypassEntries.map(([dom, secs]) => (
-        `<span class="chip">${escapeHtml(dom)} (${secs}s)<button type="button" class="chip-remove" data-revoke="${escapeHtml(dom)}" aria-label="Revoke ${escapeHtml(dom)} bypass">&times;</button></span>`
+        `<span class="chip">${escapeHtml(dom)} (${secs}s)<button type="button" class="chip-remove" data-revoke="${escapeHtml(dom)}" aria-label="Block ${escapeHtml(dom)} again">&times;</button></span>`
       )).join("");
-      $("bypassesList").querySelectorAll("button[data-revoke]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          SFX.tick();
-          fetch("/api/bypass", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ domain: btn.dataset.revoke, remove: true }),
-          });
-        });
-      });
-
-      const domEl = $("domainsList");
-      domEl.innerHTML = (state.config.blocked_domains || []).map((d) => (
+      $("domainsList").innerHTML = state.config.blocked_domains.map((d) => (
         `<span class="chip">${escapeHtml(d)}<button type="button" class="chip-remove" data-remove="${escapeHtml(d)}" aria-label="Remove ${escapeHtml(d)}">&times;</button></span>`
       )).join("");
-      domEl.querySelectorAll("button[data-remove]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          SFX.tick();
-          fetch("/api/config", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ remove_domain: btn.dataset.remove }),
-          });
-        });
-      });
     }
+
+    $("bypassesList").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-revoke]");
+      if (!btn) return;
+      sfx("tick");
+      postJSON("/api/bypass", { domain: btn.dataset.revoke, remove: true });
+    });
+
+    $("domainsList").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-remove]");
+      if (!btn) return;
+      sfx("tick");
+      postJSON("/api/config", { remove_domain: btn.dataset.remove });
+    });
 
     setInterval(() => {
       updateClockVisual();
-      if (fromDomain && fromUrl) updateBypassGate();
+      if (intercepted) updateBypassGate();
     }, 1000);
 
     function connectEvents() {
       const es = new EventSource("/api/events");
-      es.addEventListener("state", (ev) => {
-        try { renderState(JSON.parse(ev.data)); } catch (_) {}
-      });
+      es.addEventListener("state", (ev) => renderState(JSON.parse(ev.data)));
       es.onerror = () => {
         es.close();
         setTimeout(connectEvents, 2000);
@@ -2987,63 +2796,45 @@
     }
     connectEvents();
 
-    // Settings handlers
+    // Settings
     $("toggleAutoRestore").addEventListener("change", (e) => {
-      SFX.tick();
-      fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auto_restore: e.target.checked }) });
+      sfx("tick");
+      postJSON("/api/config", { auto_restore: e.target.checked });
     });
     $("toggleChime").addEventListener("change", (e) => {
-      fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ completion_chime: e.target.checked }) });
-      if (e.target.checked) setTimeout(() => SFX.confirm(), 60);
+      postJSON("/api/config", { completion_chime: e.target.checked });
+      if (!e.target.checked) return;
+      if (state) state.config.completion_chime = true; // play the confirmation before the server echoes the change
+      sfx("confirm");
     });
     $("toggleManualFocus").addEventListener("change", (e) => {
-      SFX.tick();
-      fetch("/api/focus", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: e.target.checked }) });
+      sfx("tick");
+      postJSON("/api/focus", { enabled: e.target.checked });
     });
-    $("addDomainForm").addEventListener("submit", async (e) => {
+    $("addDomainForm").addEventListener("submit", (e) => {
       e.preventDefault();
       const val = $("addDomainInput").value.trim();
       if (!val) return;
-      SFX.confirm();
+      sfx("confirm");
       $("addDomainInput").value = "";
-      await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ add_domain: val }) });
+      postJSON("/api/config", { add_domain: val });
     });
 
-    // =========================================================================
-    // CUSTOM ACCESSIBLE DECK DROPDOWN
-    // =========================================================================
+    // Deck picker
     function renderDeckDropdown() {
-      const menu = $("deckMenu");
       const current = deckOptions.find((o) => o.value === ankiDeck) || deckOptions[0];
-      if (current) {
-        $("deckTriggerText").textContent = current.label;
-        $("deckTriggerCount").textContent = String(current.count);
-        $("deckTriggerCount").classList.remove("hidden");
-      }
-
-      menu.innerHTML = deckOptions.map((opt, idx) => {
-        const selected = opt.value === ankiDeck;
-        return `
-          <button
-            type="button"
-            class="deck-option"
-            role="option"
-            data-idx="${idx}"
-            data-value="${escapeHtml(opt.value)}"
-            aria-selected="${selected}"
-            data-highlighted="${idx === deckHighlightIdx}"
-          >
+      $("deckTriggerText").textContent = current.label;
+      $("deckTriggerCount").textContent = String(current.count);
+      $("deckTriggerCount").classList.remove("hidden");
+      $("deckMenu").innerHTML = deckOptions.map((opt, idx) => `
+          <button type="button" class="deck-option" role="option" data-value="${escapeHtml(opt.value)}"
+            aria-selected="${opt.value === ankiDeck}" data-highlighted="${idx === deckHighlightIdx}">
             <span class="deck-option-left">
               <svg class="icon deck-check" viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
               <span class="deck-option-label">${escapeHtml(opt.label)}</span>
             </span>
             <span class="deck-count-badge">${opt.count}</span>
-          </button>`;
-      }).join("");
-
-      menu.querySelectorAll(".deck-option").forEach((btn) => {
-        btn.addEventListener("click", () => selectDeck(btn.dataset.value));
-      });
+          </button>`).join("");
     }
 
     function setDeckMenuOpen(open, restoreFocus = false) {
@@ -3060,46 +2851,44 @@
 
     function updateDeckHighlight() {
       $("deckMenu").querySelectorAll(".deck-option").forEach((el, idx) => {
-        const hl = idx === deckHighlightIdx;
-        el.setAttribute("data-highlighted", String(hl));
-        if (hl) el.scrollIntoView({ block: "nearest" });
+        el.setAttribute("data-highlighted", String(idx === deckHighlightIdx));
+        if (idx === deckHighlightIdx) el.scrollIntoView({ block: "nearest" });
       });
     }
 
     function selectDeck(value) {
-      SFX.tick();
+      sfx("tick");
       ankiDeck = value;
       localStorage.setItem("agentFocusDeck", ankiDeck);
       setDeckMenuOpen(false, true);
       loadAnki();
     }
 
+    $("deckMenu").addEventListener("click", (e) => {
+      const opt = e.target.closest(".deck-option");
+      if (opt) selectDeck(opt.dataset.value);
+    });
+
     $("deckTrigger").addEventListener("click", () => {
-      SFX.tick();
+      sfx("tick");
       setDeckMenuOpen(!deckMenuOpen);
     });
 
     $("deckTrigger").addEventListener("keydown", (e) => {
-      if (e.key === "ArrowDown") {
+      const step = { ArrowDown: 1, ArrowUp: -1 }[e.key];
+      if (step) {
         e.preventDefault();
-        if (!deckMenuOpen) setDeckMenuOpen(true);
-        else {
-          deckHighlightIdx = (deckHighlightIdx + 1) % Math.max(1, deckOptions.length);
-          updateDeckHighlight();
+        if (!deckMenuOpen) {
+          setDeckMenuOpen(true);
+          return;
         }
-      } else if (e.key === "ArrowUp") {
+        const n = Math.max(1, deckOptions.length);
+        deckHighlightIdx = (deckHighlightIdx + step + n) % n;
+        updateDeckHighlight();
+      } else if ((e.key === "Enter" || e.key === " ") && deckMenuOpen) {
         e.preventDefault();
-        if (!deckMenuOpen) setDeckMenuOpen(true);
-        else {
-          deckHighlightIdx = (deckHighlightIdx - 1 + deckOptions.length) % Math.max(1, deckOptions.length);
-          updateDeckHighlight();
-        }
-      } else if (e.key === "Enter" || e.key === " ") {
-        if (deckMenuOpen) {
-          e.preventDefault();
-          const chosen = deckOptions[deckHighlightIdx];
-          if (chosen) selectDeck(chosen.value);
-        }
+        const chosen = deckOptions[deckHighlightIdx];
+        if (chosen) selectDeck(chosen.value);
       } else if (e.key === "Escape" && deckMenuOpen) {
         e.preventDefault();
         setDeckMenuOpen(false, true);
@@ -3107,34 +2896,45 @@
     });
 
     document.addEventListener("click", (e) => {
-      if (deckMenuOpen && !$("deckPicker").contains(e.target)) {
-        setDeckMenuOpen(false);
-      }
+      if (deckMenuOpen && !$("deckPicker").contains(e.target)) setDeckMenuOpen(false);
     });
 
-    // --- ANKI ---
+    // Flashcards
     function renderMathIn(el) {
-      if (!el || typeof window.renderMathInElement !== "function") return;
-      try {
-        window.renderMathInElement(el, {
-          delimiters: [
-            { left: "\\(", right: "\\)", display: false },
-            { left: "\\[", right: "\\]", display: true },
-            { left: "$$", right: "$$", display: true },
-          ],
-          throwOnError: false,
-        });
-      } catch (_) {}
+      if (typeof window.renderMathInElement !== "function") return; // KaTeX loads from a CDN and may be missing offline
+      window.renderMathInElement(el, {
+        delimiters: [
+          { left: "\\(", right: "\\)", display: false },
+          { left: "\\[", right: "\\]", display: true },
+          { left: "$$", right: "$$", display: true },
+        ],
+        throwOnError: false,
+      });
     }
 
     function updateStudyModeButtons() {
-      const isDue = ankiStudyMode !== "all";
-      $("modeDueBtn").classList.toggle("active", isDue);
-      $("modeDueBtn").setAttribute("aria-pressed", String(isDue));
-      $("modeAllBtn").classList.toggle("active", !isDue);
-      $("modeAllBtn").setAttribute("aria-pressed", String(!isDue));
+      for (const [id, mode] of [["modeDueBtn", "due"], ["modeAllBtn", "all"]]) {
+        const active = (ankiStudyMode === "all") === (mode === "all");
+        $(id).classList.toggle("active", active);
+        $(id).setAttribute("aria-pressed", String(active));
+      }
     }
     updateStudyModeButtons();
+
+    function setStudyMode(mode) {
+      if (ankiStudyMode === mode) return;
+      sfx("tick");
+      ankiStudyMode = mode;
+      localStorage.setItem("agentFocusStudyMode", mode);
+      updateStudyModeButtons();
+      loadAnki();
+    }
+
+    function setSyncDot(live, tip) {
+      $("ankiSyncDot").classList.toggle("live", live);
+      $("ankiSyncTooltip").textContent = tip;
+      $("ankiDotWrap").setAttribute("aria-label", tip);
+    }
 
     async function loadAnki() {
       ankiLoadError = false;
@@ -3142,41 +2942,28 @@
         const res = await fetch(`/api/anki/cards?deck=${encodeURIComponent(ankiDeck)}&mode=${encodeURIComponent(ankiStudyMode)}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         ankiData = await res.json();
-        ankiCards = ankiData.cards || [];
+        ankiCards = ankiData.cards;
         ankiIndex = 0;
         ankiRevealed = false;
+        sessionCombo = ankiData.combo || 0;
+        setSyncDot(ankiData.source !== "offline", {
+          headless: `Synced with ${ankiData.anki_endpoint || "AnkiWeb"}`,
+          ankiconnect: "Connected to Anki Desktop",
+          offline: "Not connected. Reviews stay on this Mac.",
+        }[ankiData.source]);
 
-        const isLive = Boolean(ankiData.ankiconnect);
-        $("ankiSyncDot").classList.toggle("live", isLive);
-        let tip = "Anki not connected";
-        if (ankiData.anki_mode === "headless") {
-          const ep = ankiData.anki_endpoint || "AnkiWeb";
-          tip = `${ep} connected`;
-        } else if (isLive) {
-          tip = "Anki Desktop connected";
-        }
-        $("ankiSyncTooltip").textContent = tip;
-        $("ankiDotWrap").setAttribute("aria-label", tip);
-        sessionStreak = Number(ankiData.combo || 0);
-
-        const allCount = ankiStudyMode === "all"
-          ? ankiData.total_cards || 0
-          : (ankiData.total_due || 0) + (ankiData.total_new || 0);
-        deckOptions = [{ value: "ALL", label: "All decks", count: allCount }];
-        (ankiData.decks || []).forEach((d) => {
-          const cnt = ankiStudyMode === "all" ? (d.count || 0) : ((d.due || 0) + (d.new || 0));
-          deckOptions.push({ value: d.name, label: d.label || d.name, count: cnt });
-        });
+        const countFor = (d) => (ankiStudyMode === "all" ? d.count || 0 : (d.due || 0) + (d.new || 0));
+        deckOptions = [
+          { value: "ALL", label: "All decks", count: ankiStudyMode === "all" ? ankiData.total_cards : ankiData.total_due + ankiData.total_new },
+          ...ankiData.decks.map((d) => ({ value: d.name, label: d.label || d.name, count: countFor(d) })),
+        ];
         if (!deckOptions.some((o) => o.value === ankiDeck)) ankiDeck = "ALL";
         renderDeckDropdown();
       } catch (_) {
         ankiLoadError = true;
         ankiCards = [];
-        $("ankiSyncDot").classList.remove("live");
-        $("ankiSyncTooltip").textContent = "Server unreachable";
-        $("ankiDotWrap").setAttribute("aria-label", "Server unreachable");
+        setSyncDot(false, "Agent Focus isn’t responding");
       }
-
       $("ankiSkeleton").classList.add("hidden");
       $("ankiSkeletonAction").classList.add("hidden");
       renderAnkiCard();
@@ -3184,7 +2971,7 @@
 
     function wrapCardImages(container) {
       container.querySelectorAll("img").forEach((img) => {
-        if (img.parentElement && img.parentElement.classList.contains("img-zoom-btn")) return;
+        if (img.parentElement.classList.contains("img-zoom-btn")) return;
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "img-zoom-btn";
@@ -3195,36 +2982,6 @@
       });
     }
 
-    function emitXpFloat(originEl, text, colorToken) {
-      if (prefersReducedMotion.matches || !originEl) return;
-      const rect = originEl.getBoundingClientRect();
-      const el = document.createElement("div");
-      el.className = "xp-float";
-      el.textContent = text;
-      el.style.color = colorToken;
-      el.style.left = `${rect.left + rect.width / 2}px`;
-      el.style.top = `${rect.top - 8}px`;
-      document.body.appendChild(el);
-      const anim = el.animate(
-        [
-          { transform: "translate(-50%, 4px) scale(0.92)", opacity: 0 },
-          { transform: "translate(-50%, -10px) scale(1)", opacity: 1, offset: 0.22 },
-          { transform: "translate(-50%, -28px) scale(0.98)", opacity: 0 },
-        ],
-        { duration: 760, easing: "cubic-bezier(0.165, 0.84, 0.44, 1)", fill: "forwards" }
-      );
-      anim.onfinish = () => el.remove();
-    }
-
-    function flashSheetRim(cls) {
-      if (prefersReducedMotion.matches) return;
-      const sheet = $("ankiSheet");
-      sheet.classList.remove("flash-good", "flash-easy");
-      void sheet.offsetWidth;
-      sheet.classList.add(cls);
-      setTimeout(() => sheet.classList.remove(cls), 360);
-    }
-
     function updateStudyMetaBar() {
       const rev = ankiData?.reviewed_today || 0;
       const xp = ankiData?.xp_today || 0;
@@ -3232,8 +2989,7 @@
       const streak = ankiData?.streak_days || 0;
 
       const goal = Math.max(10, Math.min(20, (ankiData?.total_due || 0) + (ankiData?.total_new || 0) + rev || 15));
-      const pct = Math.min(1, rev / Math.max(1, goal));
-      $("sheetProgressFill").style.transform = `scaleX(${pct.toFixed(3)})`;
+      $("sheetProgressFill").style.transform = `scaleX(${Math.min(1, rev / goal).toFixed(3)})`;
 
       const parts = [`${rev} reviewed`];
       if (xp > 0) parts.push(`${xp} XP`);
@@ -3242,96 +2998,71 @@
       $("ankiReviewedMeta").innerHTML = comboHtml + escapeHtml(parts.join(" · "));
     }
 
+    function showEmptyState(title, desc, primary, secondary = null) {
+      $("ankiEmptyTitle").textContent = title;
+      $("ankiEmptyDesc").textContent = desc;
+      $("emptyPrimaryBtn").textContent = primary[0];
+      $("emptyPrimaryBtn").onclick = primary[1];
+      $("emptySecondaryBtn").classList.toggle("hidden", !secondary);
+      if (secondary) {
+        $("emptySecondaryBtn").textContent = secondary[0];
+        $("emptySecondaryBtn").onclick = secondary[1];
+      }
+    }
+
+    function goToAnkiSignIn() {
+      sfx("tick");
+      setActiveTab("settings", false, false);
+      setTimeout(() => $("ankiEmailInput").focus(), 80);
+    }
+
     function renderAnkiCard(animateNext = false) {
       updateStudyMetaBar();
+      if (animateNext && !prefersReducedMotion.matches) restartAnimation($("ankiSheet"), "settling");
 
-      if (animateNext && !prefersReducedMotion.matches) {
-        const sheet = $("ankiSheet");
-        sheet.classList.remove("settling");
-        void sheet.offsetWidth;
-        sheet.classList.add("settling");
-      }
-
-      if (ankiLoadError || !ankiCards.length) {
-        $("ankiCardContent").classList.add("hidden");
+      const empty = ankiLoadError || !ankiCards.length;
+      $("ankiCardContent").classList.toggle("hidden", empty);
+      $("kbdHints").classList.toggle("hidden", empty);
+      $("ankiEmptyState").classList.toggle("hidden", !empty);
+      $("ankiEmptyActions").classList.toggle("hidden", !empty);
+      if (empty) {
         $("showAnswerWrap").classList.add("hidden");
         $("rateWrap").classList.add("hidden");
-        $("ankiEmptyState").classList.remove("hidden");
-        $("ankiEmptyActions").classList.remove("hidden");
-        $("kbdHints").classList.add("hidden");
-
-        const isLive = Boolean(ankiData?.ankiconnect);
-        const total = ankiData?.total_cards || 0;
-
         if (ankiLoadError) {
-          $("ankiEmptyTitle").textContent = "Couldn’t load cards";
-          $("ankiEmptyDesc").textContent = "Check that Agent Focus is running and try again.";
-          $("emptyPrimaryBtn").textContent = "Retry";
-          $("emptyPrimaryBtn").onclick = loadAnki;
-          $("emptySecondaryBtn").classList.add("hidden");
-        } else if (!isLive) {
-          $("ankiEmptyTitle").textContent = "Connect Anki";
-          $("ankiEmptyDesc").textContent = "Sign in to AnkiWeb for silent direct sync, or use Anki Desktop.";
-          $("emptyPrimaryBtn").textContent = "Connect AnkiWeb";
-          $("emptyPrimaryBtn").onclick = () => {
-            SFX.tick();
-            setActiveTab("settings", false, true);
-            setTimeout(() => $("ankiEmailInput")?.focus(), 80);
-          };
-          $("emptySecondaryBtn").textContent = "Open Anki Desktop";
-          $("emptySecondaryBtn").classList.remove("hidden");
-          $("emptySecondaryBtn").onclick = launchAnki;
-        } else if (total > 0 && ankiStudyMode !== "all") {
-          $("ankiEmptyTitle").textContent = "Nothing due";
-          $("ankiEmptyDesc").textContent = "Sync to pull phone reviews, or study all cards.";
-          $("emptyPrimaryBtn").textContent = "Sync";
-          $("emptyPrimaryBtn").onclick = syncAnkiNow;
-          $("emptySecondaryBtn").textContent = "Study all cards";
-          $("emptySecondaryBtn").classList.remove("hidden");
-          $("emptySecondaryBtn").onclick = () => {
-            SFX.tick();
-            ankiStudyMode = "all";
-            localStorage.setItem("agentFocusStudyMode", ankiStudyMode);
-            updateStudyModeButtons();
-            loadAnki();
-          };
+          showEmptyState("Couldn’t load cards", "Agent Focus isn’t responding. Check that it’s running, then retry.", ["Retry", loadAnki]);
+        } else if (ankiData.source === "offline") {
+          showEmptyState(
+            "Connect Anki",
+            "Sign in to AnkiWeb in Settings, or open Anki Desktop with AnkiConnect installed.",
+            ["Sign in", goToAnkiSignIn],
+            ["Open Anki Desktop", () => launchAnki($("emptySecondaryBtn"))],
+          );
+        } else if (ankiData.total_cards > 0 && ankiStudyMode !== "all") {
+          showEmptyState("Nothing due", "Sync to pull reviews from your phone, or study all cards.", ["Sync", syncAnkiNow], ["Study all cards", () => setStudyMode("all")]);
         } else {
-          $("ankiEmptyTitle").textContent = "No cards yet";
-          $("ankiEmptyDesc").textContent = "Sync to pull your decks from AnkiWeb.";
-          $("emptyPrimaryBtn").textContent = "Sync";
-          $("emptyPrimaryBtn").onclick = syncAnkiNow;
-          $("emptySecondaryBtn").classList.add("hidden");
+          showEmptyState("No cards yet", "Sync to pull your decks.", ["Sync", syncAnkiNow]);
         }
         return;
       }
 
-      $("ankiEmptyState").classList.add("hidden");
-      $("ankiEmptyActions").classList.add("hidden");
-      $("ankiCardContent").classList.remove("hidden");
-      $("kbdHints").classList.remove("hidden");
-
-      const card = ankiCards[ankiIndex % ankiCards.length];
+      const position = ankiIndex % ankiCards.length;
+      const card = ankiCards[position];
       $("cardDeckLabel").textContent = card.deck;
-      $("cardIndexLabel").textContent = `${(ankiIndex % ankiCards.length) + 1} / ${ankiCards.length}`;
-      $("cardFront").innerHTML = card.front;
-      $("cardBack").innerHTML = card.back;
-      renderMathIn($("cardFront"));
-      renderMathIn($("cardBack"));
-      wrapCardImages($("cardFront"));
-      wrapCardImages($("cardBack"));
-
-      const intervals = card.next_reviews || [];
-      $("lbl-again").textContent = intervals[0] || "";
-      $("lbl-hard").textContent = intervals[1] || "";
-      $("lbl-good").textContent = intervals[2] || "";
-      $("lbl-easy").textContent = intervals[3] || "";
+      $("cardIndexLabel").textContent = `${position + 1} / ${ankiCards.length}`;
+      for (const [id, html] of [["cardFront", card.front], ["cardBack", card.back]]) {
+        $(id).innerHTML = html;
+        renderMathIn($(id));
+        wrapCardImages($(id));
+      }
+      ["again", "hard", "good", "easy"].forEach((ease, i) => {
+        $(`lbl-${ease}`).textContent = card.next_reviews[i] || "";
+      });
 
       $("cardFront").classList.toggle("is-revealed", ankiRevealed);
       $("cardDivider").classList.toggle("hidden", !ankiRevealed);
       $("cardBack").classList.toggle("hidden", !ankiRevealed);
       $("showAnswerWrap").classList.toggle("hidden", ankiRevealed);
       $("rateWrap").classList.toggle("hidden", !ankiRevealed);
-
       $("hintFlip").classList.toggle("hidden", ankiRevealed);
       $("hintRate").classList.toggle("hidden", !ankiRevealed);
       $("hintSkip").classList.toggle("hidden", ankiRevealed);
@@ -3339,40 +3070,37 @@
 
     async function syncAnkiNow() {
       const btn = $("syncAnkiBtn");
-      const emptyBtn = $("emptyPrimaryBtn");
-      const swap = $("syncIconSwap");
       const label = $("syncAnkiText");
       btn.disabled = true;
-      emptyBtn.disabled = true;
+      $("emptyPrimaryBtn").disabled = true;
       label.textContent = "Syncing…";
       try {
-        const res = await fetch("/api/anki/sync", { method: "POST" });
-        if (res.ok) {
-          ankiHasPendingSync = false;
-          SFX.confirm();
-          swap.setAttribute("data-swapped", "true");
-          label.textContent = "Synced";
-          await loadAnki();
-          setTimeout(() => {
-            swap.setAttribute("data-swapped", "false");
-            label.textContent = "Sync";
-          }, 1500);
-        } else {
+        const res = await postJSON("/api/anki/sync");
+        if (!res.ok) {
           label.textContent = "Failed";
           setTimeout(() => { label.textContent = "Sync"; }, 1800);
+          return;
         }
+        ankiHasPendingSync = false;
+        sfx("confirm");
+        $("syncIconSwap").setAttribute("data-swapped", "true");
+        label.textContent = "Synced";
+        await loadAnki();
+        setTimeout(() => {
+          $("syncIconSwap").setAttribute("data-swapped", "false");
+          label.textContent = "Sync";
+        }, 1500);
       } finally {
         btn.disabled = false;
-        emptyBtn.disabled = false;
+        $("emptyPrimaryBtn").disabled = false;
       }
     }
 
-    async function launchAnki() {
-      const btn = $("emptyPrimaryBtn");
+    async function launchAnki(btn) {
       btn.disabled = true;
       btn.textContent = "Opening Anki…";
       try {
-        await fetch("/api/anki/launch", { method: "POST" });
+        await postJSON("/api/anki/launch");
         await loadAnki();
       } finally {
         btn.disabled = false;
@@ -3381,106 +3109,156 @@
 
     function revealAnki(moveFocus = false) {
       if (!ankiCards.length || ankiRevealed) return;
-      SFX.flip();
+      sfx("flip");
       userEngaged = true;
       cancelRestoreCountdown();
       ankiRevealed = true;
-      renderAnkiCard(false);
-      if (moveFocus) {
-        document.querySelector('.rate-btn[data-ease="good"]')?.focus();
-      }
+      renderAnkiCard();
+      if (moveFocus) document.querySelector('.rate-btn[data-ease="good"]').focus();
     }
 
-    let ankiHasPendingSync = false;
+    function skipCard() {
+      if (!ankiCards.length) return;
+      sfx("tick");
+      ankiIndex = (ankiIndex + 1) % ankiCards.length;
+      ankiRevealed = false;
+      renderAnkiCard(true);
+    }
 
-    function flushHeadlessSyncBeacon() {
-      if (!ankiHasPendingSync || ankiData?.anki_mode !== "headless") return;
+    // The headless store debounces its own sync; this flushes it when the tab closes.
+    window.addEventListener("pagehide", () => {
+      if (!ankiHasPendingSync || ankiData?.source !== "headless") return;
       ankiHasPendingSync = false;
-      try {
-        navigator.sendBeacon("/api/anki/sync?auto=1");
-      } catch (_) {}
+      navigator.sendBeacon("/api/anki/sync?auto=1");
+    });
+
+    const RATINGS = {
+      again: { xp: 0, color: "var(--ink-11)" },
+      hard: { xp: 10, color: "var(--amber)" },
+      good: { xp: 15, color: "var(--ok)", flash: "flash-good", sparks: ["oklch(0.56 0.13 152)", "oklch(0.75 0.17 68)", "oklch(0.84 0.12 78)"] },
+      easy: { xp: 20, color: "var(--easy)", flash: "flash-easy", sparks: ["oklch(0.56 0.14 242)", "oklch(0.72 0.11 236)", "oklch(0.75 0.17 68)"] },
+    };
+    const COMBO_BONUS_XP = 5;
+
+    async function rateAnki(ease, moveFocus = false, triggerBtn = null) {
+      if (!ankiCards.length || !ankiRevealed) return;
+      userEngaged = true;
+      ankiHasPendingSync = true;
+      const rating = RATINGS[ease];
+      const origin = triggerBtn || document.querySelector(`.rate-btn[data-ease="${ease}"]`);
+      const [card] = ankiCards.splice(ankiIndex % ankiCards.length, 1);
+
+      sessionCombo = ease === "again" ? 0 : sessionCombo + 1;
+      const xpGain = ease === "again" ? 0 : rating.xp + (sessionCombo >= 3 ? COMBO_BONUS_XP : 0);
+
+      if (ease === "again") {
+        ankiCards.splice(Math.min(2, ankiCards.length), 0, card);
+        sfx("again");
+        emitXpFloat(origin, "Again soon", rating.color);
+      } else if (ease === "hard") {
+        if (ankiStudyMode === "all") ankiCards.splice(Math.min(6, ankiCards.length), 0, card);
+        sfx("hard");
+        emitXpFloat(origin, `+${xpGain} XP`, rating.color);
+      } else {
+        const deckClear = ankiCards.length === 0;
+        const milestone = deckClear || sessionCombo % 5 === 0;
+        let label = `+${xpGain} XP`;
+        if (deckClear) label = `Deck clear · +${xpGain} XP`;
+        else if (milestone) label = `${sessionCombo}x streak · +${xpGain} XP`;
+        else if (sessionCombo >= 3) label = `+${xpGain} XP · ${sessionCombo}x`;
+        flashSheetRim(rating.flash);
+        sfx(milestone ? "celebrate" : ease);
+        emitSparks(origin, rating.sparks, milestone ? 18 : 12);
+        emitXpFloat(origin, label, rating.color);
+      }
+
+      ankiData.reviewed_today += 1;
+      ankiData.xp_today += xpGain;
+      ankiData.combo = sessionCombo;
+      ankiData.streak_days ||= 1;
+      ankiRevealed = false;
+      renderAnkiCard(true);
+      if (moveFocus && ankiCards.length) $("showAnswerBtn").focus();
+
+      const res = await postJSON("/api/anki/review", { card_id: card.id, ease });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+      sessionCombo = data.combo;
+      Object.assign(ankiData, {
+        reviewed_today: data.reviewed_today,
+        xp_today: data.xp_today,
+        combo: data.combo,
+        streak_days: data.streak_days,
+      });
+      updateStudyMetaBar();
     }
 
-    window.addEventListener("pagehide", flushHeadlessSyncBeacon);
+    $("modeDueBtn").addEventListener("click", () => setStudyMode("due"));
+    $("modeAllBtn").addEventListener("click", () => setStudyMode("all"));
+    $("syncAnkiBtn").addEventListener("click", syncAnkiNow);
+    $("showAnswerBtn").addEventListener("click", () => revealAnki(true));
+    $("skipCardBtn").addEventListener("click", skipCard);
+    document.querySelectorAll(".rate-btn").forEach((btn) => {
+      btn.addEventListener("click", () => rateAnki(btn.dataset.ease, true, btn));
+    });
 
+    // Anki account card in Settings
     function setAnkiAccountMsg(text, kind = "") {
       const el = $("ankiAccountMsg");
-      if (!text) {
-        el.textContent = "";
-        el.className = "anki-account-status hidden";
-        return;
-      }
       el.textContent = text;
-      el.className = `anki-account-status${kind ? " " + kind : ""}`;
+      el.className = `anki-account-status ${kind}`.trim();
+      el.classList.toggle("hidden", !text);
     }
 
     async function loadAnkiAccount() {
-      try {
-        const res = await fetch("/api/anki/account");
-        if (!res.ok) return;
-        const info = await res.json();
-        const dot = $("ankiAccountDot");
-        const title = $("ankiAccountTitle");
-        const desc = $("ankiAccountDesc");
-        const form = $("ankiLoginForm");
-        const actions = $("ankiSignedInActions");
+      const res = await fetch("/api/anki/account");
+      if (!res.ok) return;
+      const info = await res.json();
+      const desktop = info.mode === "ankiconnect";
+      $("ankiAccountDot").classList.toggle("live", info.signed_in || desktop);
+      $("ankiLoginForm").classList.toggle("hidden", info.signed_in || !info.available);
+      $("ankiSignedInActions").classList.toggle("hidden", !info.signed_in);
 
-        if (info.signed_in) {
-          dot.classList.add("live");
-          const epLabel = info.endpoint_label || "AnkiWeb";
-          title.textContent = info.account ? `${info.account} · ${epLabel}` : `Signed in · ${epLabel}`;
-          desc.textContent = "Silent background sync active. No Anki Desktop required.";
-          form.classList.add("hidden");
-          actions.classList.remove("hidden");
-        } else if (!info.available) {
-          dot.classList.toggle("live", info.mode === "ankiconnect");
-          title.textContent = info.mode === "ankiconnect" ? "Using Anki Desktop (AnkiConnect)" : "Direct sync package not installed";
-          desc.textContent = "Run ./install.sh (or pip install anki) to enable direct AnkiWeb sync.";
-          form.classList.add("hidden");
-          actions.classList.add("hidden");
-        } else {
-          dot.classList.toggle("live", info.mode === "ankiconnect");
-          title.textContent = info.mode === "ankiconnect" ? "Using Anki Desktop (AnkiConnect)" : "Not signed in";
-          desc.textContent = "Sign in to sync directly with AnkiWeb or a self-hosted sync server — zero popups, no Anki Desktop needed.";
-          form.classList.remove("hidden");
-          actions.classList.add("hidden");
-        }
-      } catch (_) {}
+      if (info.signed_in) {
+        $("ankiAccountTitle").textContent = `${info.account || "Signed in"} · ${info.endpoint_label}`;
+        $("ankiAccountDesc").textContent = "Reviews sync in the background.";
+      } else if (!info.available) {
+        $("ankiAccountTitle").textContent = desktop ? "Using Anki Desktop" : "Anki package not installed";
+        $("ankiAccountDesc").textContent = "Run ./install.sh, or pip install anki, to sync without Anki Desktop.";
+      } else {
+        $("ankiAccountTitle").textContent = desktop ? "Using Anki Desktop" : "Not signed in";
+        $("ankiAccountDesc").textContent = "Sign in to sync with AnkiWeb or your own sync server. Anki Desktop isn’t needed.";
+      }
     }
 
     $("ankiLoginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const email = $("ankiEmailInput").value.trim();
-      const password = $("ankiPasswordInput").value;
-      const endpoint = $("ankiEndpointInput").value.trim();
-      if (!email || !password) return;
-
       const btn = $("ankiLoginBtn");
+      const body = {
+        email: $("ankiEmailInput").value.trim(),
+        password: $("ankiPasswordInput").value,
+        endpoint: $("ankiEndpointInput").value.trim(),
+      };
       btn.disabled = true;
-      btn.textContent = "Signing in & syncing…";
-      setAnkiAccountMsg("Authenticating and downloading your collection…");
+      btn.textContent = "Signing in…";
+      setAnkiAccountMsg("Signing in and downloading your collection…");
       try {
-        const res = await fetch("/api/anki/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, endpoint }),
-        });
-        $("ankiPasswordInput").value = "";
+        const res = await postJSON("/api/anki/login", body);
         const data = await res.json().catch(() => ({}));
-        if (res.ok && data.ok) {
-          SFX.confirm();
+        if (res.ok) {
+          sfx("confirm");
           setAnkiAccountMsg("Signed in and synced.", "ok");
           await loadAnkiAccount();
           await loadAnki();
         } else {
-          setAnkiAccountMsg(data.error || "Sign-in failed. Check credentials and try again.", "error");
+          setAnkiAccountMsg(data.error || "Sign-in failed. Check your email and password.", "error");
         }
-      } catch (err) {
-        $("ankiPasswordInput").value = "";
-        setAnkiAccountMsg("Could not reach Agent Focus daemon.", "error");
+      } catch (_) {
+        setAnkiAccountMsg("Agent Focus isn’t responding.", "error");
       } finally {
+        $("ankiPasswordInput").value = "";
         btn.disabled = false;
-        btn.textContent = "Sign in & sync";
+        btn.textContent = "Sign in";
       }
     });
 
@@ -3488,17 +3266,13 @@
       const btn = $("ankiSettingsSyncBtn");
       btn.disabled = true;
       btn.textContent = "Syncing…";
-      setAnkiAccountMsg("Syncing collection…");
+      setAnkiAccountMsg("Syncing…");
       try {
-        const res = await fetch("/api/anki/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ media: true }),
-        });
+        const res = await postJSON("/api/anki/sync", { media: true });
         const data = await res.json().catch(() => ({}));
-        if (res.ok && data.ok) {
-          SFX.confirm();
-          setAnkiAccountMsg("Sync complete.", "ok");
+        if (res.ok) {
+          sfx("confirm");
+          setAnkiAccountMsg("Synced.", "ok");
           await loadAnki();
         } else {
           setAnkiAccountMsg(data.error || "Sync failed.", "error");
@@ -3510,142 +3284,20 @@
     });
 
     $("ankiLogoutBtn").addEventListener("click", async () => {
-      SFX.tick();
-      await fetch("/api/anki/logout", { method: "POST" });
-      setAnkiAccountMsg("Signed out. Local sync token removed.");
+      sfx("tick");
+      await postJSON("/api/anki/logout");
+      setAnkiAccountMsg("Signed out. The sync key was deleted from this Mac.");
       await loadAnkiAccount();
       await loadAnki();
     });
 
     loadAnkiAccount();
 
-    async function rateAnki(ease, moveFocus = false, triggerBtn = null) {
-      if (!ankiCards.length || !ankiRevealed) return;
-      userEngaged = true;
-      ankiHasPendingSync = true;
-      const idx = ankiIndex % ankiCards.length;
-      const card = ankiCards[idx];
-      const origin = triggerBtn || document.querySelector(`.rate-btn[data-ease="${ease}"]`);
-
-      const baseXp = { again: 0, hard: 10, good: 15, easy: 20 }[ease] || 0;
-      ankiCards.splice(idx, 1);
-
-      let nextCombo = sessionStreak;
-      let xpGain = 0;
-
-      if (ease === "again") {
-        nextCombo = 0;
-        sessionStreak = 0;
-        SFX.rateAgain();
-        emitXpFloat(origin, "Again soon", "var(--ink-11)");
-        ankiCards.splice(Math.min(2, ankiCards.length), 0, card);
-      } else {
-        nextCombo = sessionStreak + 1;
-        sessionStreak = nextCombo;
-        xpGain = baseXp + (nextCombo >= 3 ? 5 : 0);
-
-        if (ease === "hard") {
-          SFX.rateHard();
-          emitXpFloat(origin, `+${xpGain} XP`, "var(--amber)");
-          if (ankiStudyMode === "all") ankiCards.splice(Math.min(6, ankiCards.length), 0, card);
-        } else if (ease === "good") {
-          flashSheetRim("flash-good");
-          const isMilestone = ankiCards.length === 0 || nextCombo % 5 === 0;
-          if (isMilestone) {
-            SFX.celebrate();
-            emitSparks(origin, ["oklch(0.75 0.17 68)", "oklch(0.56 0.13 152)", "oklch(0.84 0.12 78)"], 18);
-            const msg = ankiCards.length === 0 ? `Deck clear · +${xpGain} XP` : `${nextCombo}x streak · +${xpGain} XP`;
-            emitXpFloat(origin, msg, "var(--ok)");
-          } else {
-            SFX.rateGood();
-            emitSparks(origin, ["oklch(0.56 0.13 152)", "oklch(0.75 0.17 68)"], 10);
-            const msg = nextCombo >= 3 ? `+${xpGain} XP · ${nextCombo}x` : `+${xpGain} XP`;
-            emitXpFloat(origin, msg, "var(--ok)");
-          }
-        } else if (ease === "easy") {
-          flashSheetRim("flash-easy");
-          const isMilestone = ankiCards.length === 0 || nextCombo % 5 === 0;
-          if (isMilestone) {
-            SFX.celebrate();
-            emitSparks(origin, ["oklch(0.56 0.14 242)", "oklch(0.75 0.17 68)", "oklch(0.72 0.11 236)"], 20);
-            const msg = ankiCards.length === 0 ? `Clean sweep · +${xpGain} XP` : `Effortless · ${nextCombo}x`;
-            emitXpFloat(origin, msg, "var(--easy)");
-          } else {
-            SFX.rateEasy();
-            emitSparks(origin, ["oklch(0.56 0.14 242)", "oklch(0.72 0.11 236)", "oklch(0.75 0.17 68)"], 14);
-            const msg = nextCombo >= 3 ? `Effortless · +${xpGain} XP` : `+${xpGain} XP`;
-            emitXpFloat(origin, msg, "var(--easy)");
-          }
-        }
-      }
-
-      if (ankiData) {
-        ankiData.reviewed_today = (ankiData.reviewed_today || 0) + 1;
-        ankiData.xp_today = (ankiData.xp_today || 0) + xpGain;
-        ankiData.combo = nextCombo;
-        if (!ankiData.streak_days) ankiData.streak_days = 1;
-      }
-      ankiRevealed = false;
-      renderAnkiCard(true);
-      if (moveFocus && ankiCards.length) {
-        $("showAnswerBtn").focus();
-      }
-
-      const res = await fetch("/api/anki/review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ card_id: card.id, ease }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (ankiData) {
-        if (typeof data.reviewed_today === "number") ankiData.reviewed_today = data.reviewed_today;
-        if (typeof data.xp_today === "number") ankiData.xp_today = data.xp_today;
-        if (typeof data.combo === "number") {
-          ankiData.combo = data.combo;
-          sessionStreak = data.combo;
-        }
-        if (typeof data.streak_days === "number") ankiData.streak_days = data.streak_days;
-        updateStudyMetaBar();
-      }
-    }
-
-    $("modeDueBtn").addEventListener("click", () => {
-      if (ankiStudyMode === "due") return;
-      SFX.tick();
-      ankiStudyMode = "due";
-      localStorage.setItem("agentFocusStudyMode", ankiStudyMode);
-      updateStudyModeButtons();
-      loadAnki();
-    });
-
-    $("modeAllBtn").addEventListener("click", () => {
-      if (ankiStudyMode === "all") return;
-      SFX.tick();
-      ankiStudyMode = "all";
-      localStorage.setItem("agentFocusStudyMode", ankiStudyMode);
-      updateStudyModeButtons();
-      loadAnki();
-    });
-
-    $("syncAnkiBtn").addEventListener("click", syncAnkiNow);
-    $("showAnswerBtn").addEventListener("click", () => revealAnki(true));
-    $("skipCardBtn").addEventListener("click", () => {
-      if (!ankiCards.length) return;
-      SFX.tick();
-      ankiIndex = (ankiIndex + 1) % ankiCards.length;
-      ankiRevealed = false;
-      renderAnkiCard(true);
-    });
-
-    document.querySelectorAll(".rate-btn").forEach((btn) => {
-      btn.addEventListener("click", () => rateAnki(btn.dataset.ease, true, btn));
-    });
-
-    // --- Modal Lightbox with Focus Management ---
+    // Image lightbox
     function openLightbox(src, alt, triggerEl) {
-      SFX.tick();
-      lightboxTriggerEl = triggerEl || document.activeElement;
-      document.querySelector(".shell")?.setAttribute("inert", "");
+      sfx("tick");
+      lightboxTriggerEl = triggerEl;
+      document.querySelector(".shell").setAttribute("inert", "");
       $("lightboxImg").src = src;
       $("lightboxImg").alt = alt;
       $("lightbox").setAttribute("data-open", "true");
@@ -3654,10 +3306,8 @@
 
     function closeLightbox() {
       $("lightbox").setAttribute("data-open", "false");
-      document.querySelector(".shell")?.removeAttribute("inert");
-      if (lightboxTriggerEl && typeof lightboxTriggerEl.focus === "function") {
-        lightboxTriggerEl.focus();
-      }
+      document.querySelector(".shell").removeAttribute("inert");
+      lightboxTriggerEl?.focus();
       lightboxTriggerEl = null;
     }
 
@@ -3666,52 +3316,39 @@
       if (e.target === $("lightbox")) closeLightbox();
     });
 
-    // Global keyboard shortcuts
+    const RATING_KEYS = { 1: "again", 2: "hard", 3: "good", 4: "easy" };
+
     document.addEventListener("keydown", (e) => {
       if ($("lightbox").getAttribute("data-open") === "true") {
-        if (e.key === "Escape") { e.preventDefault(); closeLightbox(); }
-        else if (e.key === "Tab") { e.preventDefault(); $("lightboxClose").focus(); }
+        if (e.key === "Escape" || e.key === "Tab") e.preventDefault();
+        if (e.key === "Escape") closeLightbox();
+        if (e.key === "Tab") $("lightboxClose").focus();
         return;
       }
-
-      if (e.repeat) return;
-
-      const target = e.target;
-      const tag = (target?.tagName || "").toLowerCase();
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = e.target.tagName.toLowerCase();
       if (tag === "textarea" || tag === "input") return;
       if (!$("panel-anki").classList.contains("active") || !ankiCards.length) return;
 
-      const interactiveFocused =
-        tag === "button" || tag === "a" || target?.getAttribute?.("role") === "tab" || target?.getAttribute?.("role") === "combobox";
-
+      const interactiveFocused = tag === "button" || tag === "a";
       if (e.code === "Space" && !interactiveFocused) {
         e.preventDefault();
-        if (!ankiRevealed) revealAnki(true);
-      } else if ((e.key === "s" || e.key === "S") && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        SFX.tick();
-        ankiIndex = (ankiIndex + 1) % ankiCards.length;
-        ankiRevealed = false;
-        renderAnkiCard(true);
-      } else if (ankiRevealed && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        if (e.key === "1") rateAnki("again", true);
-        if (e.key === "2") rateAnki("hard", true);
-        if (e.key === "3") rateAnki("good", true);
-        if (e.key === "4") rateAnki("easy", true);
+        revealAnki(true);
+      } else if (e.key === "s" || e.key === "S") {
+        skipCard();
+      } else if (ankiRevealed && RATING_KEYS[e.key]) {
+        rateAnki(RATING_KEYS[e.key], true);
       }
     });
 
     loadAnki();
 
-    // --- SCRATCHPAD ---
+    // Notes
     let padSaveTimer = null;
-    fetch("/api/scratchpad").then((r) => r.json()).then((d) => { $("padArea").value = d.text || ""; });
+    fetch("/api/scratchpad").then((r) => r.json()).then((d) => { $("padArea").value = d.text; });
 
     function savePadText(text) {
-      return fetch("/api/scratchpad", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
+      return postJSON("/api/scratchpad", { text });
     }
 
     $("padArea").addEventListener("input", () => {
@@ -3725,7 +3362,6 @@
       }, 300);
     });
 
-    // Cmd/Ctrl + Enter submits Scratchpad to Obsidian (emil-forms-and-inputs)
     $("padArea").addEventListener("keydown", (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
@@ -3736,14 +3372,18 @@
     $("copyPadBtn").addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText($("padArea").value);
-        SFX.confirm();
-        $("copyIconSwap").setAttribute("data-swapped", "true");
-        $("copyPadText").textContent = "Copied";
-        setTimeout(() => {
-          $("copyIconSwap").setAttribute("data-swapped", "false");
-          $("copyPadText").textContent = "Copy";
-        }, 1500);
-      } catch (_) {}
+      } catch (_) {
+        $("copyPadText").textContent = "Couldn’t copy";
+        setTimeout(() => { $("copyPadText").textContent = "Copy"; }, 1500);
+        return;
+      }
+      sfx("confirm");
+      $("copyIconSwap").setAttribute("data-swapped", "true");
+      $("copyPadText").textContent = "Copied";
+      setTimeout(() => {
+        $("copyIconSwap").setAttribute("data-swapped", "false");
+        $("copyPadText").textContent = "Copy";
+      }, 1500);
     });
 
     $("obsidianPadBtn").addEventListener("click", async () => {
@@ -3752,14 +3392,9 @@
       const btn = $("obsidianPadBtn");
       btn.disabled = true;
       try {
-        const res = await fetch("/api/scratchpad/obsidian", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        });
-        const data = await res.json();
+        const data = await (await postJSON("/api/scratchpad/obsidian", { text })).json();
         if (data.ok) {
-          SFX.rateGood();
+          sfx("good");
           emitSparks(btn, ["oklch(0.75 0.17 68)", "oklch(0.56 0.13 152)"], 12);
           $("padStatus").textContent = "Appended to Obsidian";
         } else {
@@ -3773,7 +3408,7 @@
     $("clearPadBtn").addEventListener("click", async () => {
       const prev = $("padArea").value;
       if (!prev) return;
-      SFX.tick();
+      sfx("tick");
       $("padArea").value = "";
       await savePadText("");
       $("padStatus").textContent = "Cleared";
@@ -3784,9 +3419,7 @@
       });
     });
 
-    // =========================================================================
-    // REST TAB — SLOW COHERENT BREATHING DIAL (Full-cycle unhurried sweep)
-    // =========================================================================
+    // Rest: one sweep of the dial per breath cycle
     const CADENCES = {
       slow: [
         { name: "Inhale", sec: 5.5, dir: "in" },
@@ -3794,20 +3427,20 @@
       ],
       calm: [
         { name: "Inhale", sec: 4, dir: "in" },
-        { name: "Hold",   sec: 4, dir: "hold_in" },
+        { name: "Hold", sec: 4, dir: "hold_in" },
         { name: "Exhale", sec: 6, dir: "out" },
       ],
       box: [
         { name: "Inhale", sec: 4, dir: "in" },
-        { name: "Hold",   sec: 4, dir: "hold_in" },
+        { name: "Hold", sec: 4, dir: "hold_in" },
         { name: "Exhale", sec: 4, dir: "out" },
-        { name: "Rest",   sec: 4, dir: "hold_out" },
+        { name: "Rest", sec: 4, dir: "hold_out" },
       ],
     };
 
     const DIAL_CIRC = 2 * Math.PI * 102;
-    let activeCadenceKey = localStorage.getItem("agentFocusCadence") || "slow";
-    if (!CADENCES[activeCadenceKey]) activeCadenceKey = "slow";
+    const savedCadence = localStorage.getItem("agentFocusCadence");
+    let activeCadenceKey = CADENCES[savedCadence] ? savedCadence : "slow";
     let breathRunning = true;
     let breathAudioOn = false;
     let breathCycleStart = 0;
@@ -3815,55 +3448,35 @@
     let breathCyclesDone = 0;
     let breathRaf = null;
 
-    // Generate 60 precision radial tick marks on the breathing dial
-    (function buildDialTicks() {
-      const g = $("dialTicks");
-      const cx = 124, cy = 124;
-      let svg = "";
-      for (let i = 0; i < 60; i++) {
-        const angle = (i / 60) * Math.PI * 2 - Math.PI / 2;
-        const isMajor = i % 5 === 0;
-        const r1 = isMajor ? 111 : 114;
-        const r2 = 120;
-        const x1 = (cx + Math.cos(angle) * r1).toFixed(2);
-        const y1 = (cy + Math.sin(angle) * r1).toFixed(2);
-        const x2 = (cx + Math.cos(angle) * r2).toFixed(2);
-        const y2 = (cy + Math.sin(angle) * r2).toFixed(2);
-        svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="dial-tick${isMajor ? " major" : ""}" stroke-width="${isMajor ? 1.4 : 0.9}" />`;
-      }
-      g.innerHTML = svg;
-    })();
-
-    function cycleTotalSec(key) {
-      return CADENCES[key].reduce((acc, p) => acc + p.sec, 0);
-    }
+    $("dialTicks").innerHTML = Array.from({ length: 60 }, (_, i) => {
+      const angle = (i / 60) * Math.PI * 2 - Math.PI / 2;
+      const major = i % 5 === 0;
+      const point = (r) => [(124 + Math.cos(angle) * r).toFixed(2), (124 + Math.sin(angle) * r).toFixed(2)];
+      const [x1, y1] = point(major ? 111 : 114);
+      const [x2, y2] = point(120);
+      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="dial-tick${major ? " major" : ""}" stroke-width="${major ? 1.4 : 0.9}" />`;
+    }).join("");
 
     function renderPhaseStrip(activeIdx = 0) {
-      const phases = CADENCES[activeCadenceKey];
-      $("phaseStrip").innerHTML = phases.map((p, idx) => (
+      $("phaseStrip").innerHTML = CADENCES[activeCadenceKey].map((p, idx) => (
         `<span class="phase-step${idx === activeIdx ? " active" : ""}">${p.name} ${p.sec}s</span>`
       )).join("");
     }
 
     function setBloomLevel(level) {
-      const outer = $("bloomOuter");
-      const mid = $("bloomMid");
-      const core = $("bloomCore");
       if (prefersReducedMotion.matches) {
-        outer.style.transform = "scale(1)";
-        mid.style.transform = "scale(1)";
-        core.style.transform = "scale(1)";
+        ["bloomOuter", "bloomMid", "bloomCore"].forEach((id) => { $(id).style.transform = "scale(1)"; });
         return;
       }
-      // Subtle, gentle lung-like amplitude (no dramatic jumps)
-      const sOuter = 0.88 + 0.28 * level;
-      const sMid = 0.90 + 0.20 * level;
-      const sCore = 0.95 + 0.08 * level;
-      outer.style.transform = `scale(${sOuter.toFixed(4)})`;
-      outer.style.opacity = (0.35 + 0.42 * level).toFixed(3);
-      mid.style.transform = `scale(${sMid.toFixed(4)})`;
-      mid.style.opacity = (0.48 + 0.36 * level).toFixed(3);
-      core.style.transform = `scale(${sCore.toFixed(4)})`;
+      $("bloomOuter").style.transform = `scale(${(0.88 + 0.28 * level).toFixed(4)})`;
+      $("bloomOuter").style.opacity = (0.35 + 0.42 * level).toFixed(3);
+      $("bloomMid").style.transform = `scale(${(0.9 + 0.2 * level).toFixed(4)})`;
+      $("bloomMid").style.opacity = (0.48 + 0.36 * level).toFixed(3);
+      $("bloomCore").style.transform = `scale(${(0.95 + 0.08 * level).toFixed(4)})`;
+    }
+
+    function breathChime(phaseName) {
+      if (breathAudioOn && (phaseName === "Inhale" || phaseName === "Exhale")) sfx(phaseName.toLowerCase());
     }
 
     function tickRest(now) {
@@ -3872,9 +3485,8 @@
         return;
       }
       const phases = CADENCES[activeCadenceKey];
-      const totalSec = cycleTotalSec(activeCadenceKey);
+      const totalSec = phases.reduce((acc, p) => acc + p.sec, 0);
       let cycleElapsed = (now - breathCycleStart) / 1000;
-
       if (cycleElapsed >= totalSec) {
         const completed = Math.floor(cycleElapsed / totalSec);
         breathCyclesDone += completed;
@@ -3882,111 +3494,102 @@
         cycleElapsed = (now - breathCycleStart) / 1000;
         $("breathCycles").textContent = `${breathCyclesDone} ${breathCyclesDone === 1 ? "cycle" : "cycles"}`;
       }
+      $("dialProgress").style.strokeDashoffset = String(DIAL_CIRC * (1 - Math.min(1, cycleElapsed / totalSec)));
 
-      // Single unhurried sweep around the dial per ENTIRE breath cycle (11–16s)
-      const cycleFrac = Math.min(1, cycleElapsed / totalSec);
-      $("dialProgress").style.strokeDashoffset = String(DIAL_CIRC * (1 - cycleFrac));
-
-      // Locate current phase and sinusoidal lung level
-      let acc = 0;
       let phaseIdx = 0;
-      let phaseFrac = 0;
-      for (let i = 0; i < phases.length; i++) {
-        if (cycleElapsed <= acc + phases[i].sec || i === phases.length - 1) {
-          phaseIdx = i;
-          phaseFrac = Math.min(1, Math.max(0, (cycleElapsed - acc) / phases[i].sec));
-          break;
-        }
-        acc += phases[i].sec;
+      let phaseStart = 0;
+      while (phaseIdx < phases.length - 1 && cycleElapsed > phaseStart + phases[phaseIdx].sec) {
+        phaseStart += phases[phaseIdx].sec;
+        phaseIdx += 1;
       }
-
-      const p = phases[phaseIdx];
+      const phase = phases[phaseIdx];
+      const phaseFrac = Math.min(1, Math.max(0, (cycleElapsed - phaseStart) / phase.sec));
       if (phaseIdx !== breathLastPhaseIdx) {
         breathLastPhaseIdx = phaseIdx;
-        $("breathPhaseName").textContent = p.name;
+        $("breathPhaseName").textContent = phase.name;
         renderPhaseStrip(phaseIdx);
-        SFX.breath(p.name);
+        breathChime(phase.name);
       }
 
-      // Smooth sinusoidal ease: velocity approaches 0 naturally at inhale peak & exhale trough
-      const sine = 0.5 - 0.5 * Math.cos(Math.PI * phaseFrac);
-      let level = 0;
-      if (p.dir === "in") level = sine;
-      else if (p.dir === "hold_in") level = 1;
-      else if (p.dir === "out") level = 1 - sine;
-      else level = 0;
-
-      setBloomLevel(level);
+      // Cosine easing so the bloom slows to a stop at the top of the inhale and bottom of the exhale.
+      const eased = 0.5 - 0.5 * Math.cos(Math.PI * phaseFrac);
+      setBloomLevel({ in: eased, hold_in: 1, out: 1 - eased, hold_out: 0 }[phase.dir]);
       breathRaf = requestAnimationFrame(tickRest);
+    }
+
+    function syncBreathToggle() {
+      $("breathToggleBtn").textContent = breathRunning ? "Pause" : "Resume";
+      $("breathToggleBtn").setAttribute("aria-pressed", String(breathRunning));
     }
 
     function startRestLoop() {
       if (!breathRunning) return;
       breathCycleStart = performance.now();
       breathLastPhaseIdx = -1;
-      if (breathRaf) cancelAnimationFrame(breathRaf);
+      cancelAnimationFrame(breathRaf);
       breathRaf = requestAnimationFrame(tickRest);
     }
 
-    function pauseRestLoop(userInitiated = false) {
+    function pauseRestLoop(userInitiated) {
       if (userInitiated) breathRunning = false;
-      if (breathRaf) {
-        cancelAnimationFrame(breathRaf);
-        breathRaf = null;
-      }
-      $("breathToggleBtn").textContent = breathRunning ? "Pause" : "Resume";
-      $("breathToggleBtn").setAttribute("aria-pressed", String(breathRunning));
+      cancelAnimationFrame(breathRaf);
+      breathRaf = null;
+      syncBreathToggle();
     }
 
+    function markActiveCadence() {
+      document.querySelectorAll("[data-cadence]").forEach((b) => {
+        const active = b.dataset.cadence === activeCadenceKey;
+        b.classList.toggle("active", active);
+        b.setAttribute("aria-pressed", String(active));
+      });
+    }
+    markActiveCadence();
+
     document.querySelectorAll("[data-cadence]").forEach((btn) => {
-      const key = btn.dataset.cadence;
-      const isActive = key === activeCadenceKey;
-      btn.classList.toggle("active", isActive);
-      btn.setAttribute("aria-pressed", String(isActive));
       btn.addEventListener("click", () => {
-        if (activeCadenceKey === key) return;
-        SFX.tick();
-        activeCadenceKey = key;
-        localStorage.setItem("agentFocusCadence", key);
-        document.querySelectorAll("[data-cadence]").forEach((b) => {
-          const on = b.dataset.cadence === key;
-          b.classList.toggle("active", on);
-          b.setAttribute("aria-pressed", String(on));
-        });
+        if (activeCadenceKey === btn.dataset.cadence) return;
+        sfx("tick");
+        activeCadenceKey = btn.dataset.cadence;
+        localStorage.setItem("agentFocusCadence", activeCadenceKey);
+        markActiveCadence();
         breathLastPhaseIdx = -1;
         renderPhaseStrip(0);
-        if (breathRunning) startRestLoop();
-        else {
-          $("breathPhaseName").textContent = CADENCES[key][0].name;
-          setBloomLevel(0);
-          $("dialProgress").style.strokeDashoffset = String(DIAL_CIRC);
+        if (breathRunning) {
+          startRestLoop();
+          return;
         }
+        $("breathPhaseName").textContent = CADENCES[activeCadenceKey][0].name;
+        setBloomLevel(0);
+        $("dialProgress").style.strokeDashoffset = String(DIAL_CIRC);
       });
     });
 
     $("breathToggleBtn").addEventListener("click", () => {
-      SFX.tick();
-      breathRunning = !breathRunning;
-      $("breathToggleBtn").textContent = breathRunning ? "Pause" : "Resume";
-      $("breathToggleBtn").setAttribute("aria-pressed", String(breathRunning));
-      if (breathRunning) startRestLoop();
-      else pauseRestLoop(true);
+      sfx("tick");
+      if (breathRunning) {
+        pauseRestLoop(true);
+        return;
+      }
+      breathRunning = true;
+      syncBreathToggle();
+      startRestLoop();
     });
 
     $("breathAudioBtn").addEventListener("click", () => {
       breathAudioOn = !breathAudioOn;
       $("breathAudioBtn").setAttribute("aria-pressed", String(breathAudioOn));
       $("breathAudioSwap").setAttribute("data-swapped", String(breathAudioOn));
-      if (breathAudioOn) SFX.breath("Inhale");
-      else SFX.tick();
+      if (breathAudioOn) breathChime("Inhale");
+      else sfx("tick");
     });
 
     renderPhaseStrip(0);
 
-    // Activate persisted (or ?tab=) tab after all modules are initialized
     const tabParam = params.get("tab");
-    const initialTab = (tabParam && document.getElementById(`panel-${tabParam}`)) ? tabParam : (localStorage.getItem("agentFocusTab") || "anki");
-    setActiveTab(document.getElementById(`panel-${initialTab}`) ? initialTab : "anki", false, false);
+    const savedTab = localStorage.getItem("agentFocusTab");
+    const initialTab = [tabParam, savedTab].find((t) => t && $(`panel-${t}`)) || "anki";
+    setActiveTab(initialTab, false, false);
   </script>
 </body>
 </html>

@@ -1,2 +1,2 @@
-# Optional: enables direct headless AnkiWeb / self-hosted sync without Anki Desktop.
+# Optional. Lets Agent Focus sync with AnkiWeb or a self-hosted server without Anki Desktop.
 anki>=26.9

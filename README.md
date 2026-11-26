@@ -1,66 +1,102 @@
 # Agent Focus
 
-Stop drifting into Reddit, Hacker News, LinkedIn, news, or email while waiting for a coding agent to finish a turn.
+A coding agent takes a few minutes per turn, and a few minutes is just long enough to open Reddit and lose twenty. Agent Focus closes that gap on macOS.
 
-Agent Focus hooks into **Claude Code**, **Codex**, and **Antigravity** on macOS. While any agent is actively running, Safari tabs pointing at your distracting domains redirect to a calm local wait-state page (`http://127.0.0.1:7842`) with:
+It hooks into Claude Code, Codex, and Antigravity. While any agent is working, Safari tabs on the sites you list are redirected to a local page at `http://127.0.0.1:7842`. When the last run finishes, the page tells you and offers a button back to your editor.
 
-- **Two-way Anki flashcards** via AnkiConnect (with KaTeX math, click-to-zoom images, keyboard shortcuts, and automatic AnkiWeb sync)
-- **Scratchpad** that autosaves locally and appends directly to an Obsidian note (`⌘↩`)
-- **Slow breathing dial** for stepping back from feeds without a stressful countdown
-- **30-second emergency bypass gate** (server-enforced cooldown before allowing a 2-minute visit, e.g. for a 2FA email)
-- **Auto-restore** that sends your tab back once all agents finish (pausing if you are mid-card or typing)
+The wait page has four tabs:
 
-Zero dependencies beyond macOS Python 3, no `sudo`, no Xcode signing, and no system proxy conflicts.
+- **Flashcards.** Review your Anki decks. Ratings go to Anki's real scheduler (SM-2 or FSRS) and sync back to AnkiWeb. `Space` shows the answer, `1` to `4` rate, `S` skips.
+- **Notes.** A scratchpad that saves as you type. `⌘↩` appends it to an Obsidian note.
+- **Rest.** A slow breathing dial, for when you'd rather look away from a screen.
+- **Settings.** Blocked sites, sounds, auto-restore, and Anki sign-in.
 
-## Quick start
+If you really need a blocked site (a 2FA email, say), the bypass button unlocks after 30 seconds and opens the site for 2 minutes. The server enforces the wait, so reloading the page doesn't skip it.
+
+No `sudo`, no browser extension, no system proxy. The daemon only listens on `127.0.0.1`.
+
+## Install
 
 ```bash
 git clone https://github.com/<your-username>/agent-focus.git
 cd agent-focus
 ./install.sh
-```
-
-Run a 35-second interactive demo right away:
-
-```bash
 agent-focus demo
 ```
 
-## CLI
+`install.sh` creates a LaunchAgent, links the `agent-focus` command into `~/.local/bin`, and adds hooks to Claude Code (`~/.claude/settings.json`), Codex (`~/.codex/hooks.json`), and Antigravity (`~/.gemini/config/hooks.json`) when those files exist. It also creates a small venv with the `anki` package for direct sync. Set `AGENT_FOCUS_NO_VENV=1` to skip that and run on the system Python 3 alone.
+
+## Anki
+
+Agent Focus looks for your cards in three places, in this order:
+
+1. **Its own synced collection (recommended).** Sign in once and Agent Focus syncs with AnkiWeb directly through the official `anki` package. Anki Desktop doesn't need to be open, and no sync dialogs pop up. Reviews are pushed about a minute after your last rating, and again when your agents finish.
+2. **Anki Desktop with [AnkiConnect](https://ankiweb.net/shared/info/2055492159).** Ratings go straight into the open collection. Agent Focus never starts an AnkiConnect sync on its own, because that opens a dialog in Anki. Press **Sync** when you want one.
+3. **A read-only copy** of Anki Desktop's collection, for when neither is available. Reviews are counted locally and not written back.
+
+### Sign in
+
+From the **Settings** tab, or from a terminal:
 
 ```bash
-agent-focus status        # Inspect active agent sessions and config
-agent-focus demo [secs]   # Simulate a live agent run and open Safari
-agent-focus open          # Open http://127.0.0.1:7842
-agent-focus on | off      # Toggle always-block mode manually
-agent-focus pause [mins]  # Pause Safari blocking temporarily
-agent-focus resume        # Resume immediately
-agent-focus clear         # Clear stuck active sessions
-agent-focus restart       # Restart the background LaunchAgent
-agent-focus logs          # Tail daemon logs
+agent-focus anki login                                       # AnkiWeb
+agent-focus anki login --endpoint https://sync.example.com/  # self-hosted sync server
+agent-focus anki status
+agent-focus anki sync
+agent-focus anki logout
 ```
 
-## Two-way Anki sync
+Your password is sent to the sync server once, in exchange for a sync key. Only the key, the endpoint, and your username are saved, in `~/.local/share/anki-headless/agent-focus/auth.json` with `0600` permissions. The synced collection lives in the same folder, separate from Anki Desktop's.
 
-1. Install **AnkiConnect** in Anki Desktop (`Tools -> Add-ons -> Get Add-ons... -> 2055492159`) and restart Anki.
-2. Reviews submitted in Safari (`Space` to flip, `1`–`4` to rate) update Anki's real scheduler via `answerCards` and trigger a debounced AnkiWeb sync.
-3. If Anki is closed, Agent Focus falls back to a safe read-only snapshot of your local collection without risking database locks.
+A self-hosted server is anything that speaks the Anki sync protocol, including the one that ships with Anki: `python -m anki.syncserver`.
+
+## Commands
+
+```bash
+agent-focus status         # active agent sessions and config
+agent-focus demo [secs]    # fake a 35-second agent run and open Safari
+agent-focus open           # open the wait page
+agent-focus on | off       # block sites even with no agent running
+agent-focus pause [mins]   # stop blocking for a while (default 10)
+agent-focus resume
+agent-focus clear          # forget stuck sessions
+agent-focus anki ...       # see above
+agent-focus restart        # restart the LaunchAgent
+agent-focus logs
+```
 
 ## Configuration
 
-Your personal config lives at `~/.local/share/agent-focus/config.json` (never committed to git). Edit domains directly in the **Settings** tab, or edit the JSON file:
+`~/.local/share/agent-focus/config.json` is created from `config.example.json` on first install and is never overwritten. Most of it can be edited in **Settings**.
 
-- `blocked_domains`: hostnames to intercept in Safari (matches subdomains, e.g. `reddit.com` catches `old.reddit.com`; use `mail.proton.me` to block webmail without blocking other subdomains)
-- `bypass_cooldown_seconds`: wait time before emergency bypass unlocks (default `30`)
-- `default_bypass_seconds`: length of a temporary bypass (default `120`)
-- `obsidian_note_path`: optional path to a Markdown file in your Obsidian vault for the `Append to Obsidian` action
-- `anki_profile_dir`: path to your Anki profile folder
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `blocked_domains` | see example | Hostnames to redirect. `reddit.com` also catches `old.reddit.com`. List `mail.proton.me` to block webmail but not the rest of `proton.me`. |
+| `bypass_cooldown_seconds` | `30` | Wait before the bypass button unlocks. |
+| `default_bypass_seconds` | `120` | How long a bypassed site stays open. |
+| `auto_restore` | `false` | Reopen the blocked site when the last run ends, unless you're mid-card or typing. |
+| `return_app` | `Orca` | App the **Return to** button brings forward. |
+| `obsidian_note_path` | empty | Markdown file the Notes tab appends to. |
+| `anki_sync_endpoint` | empty | Self-hosted sync server. Empty means AnkiWeb. |
+| `anki_profile_dir` | `~/Library/Application Support/Anki2/User 1` | Anki Desktop profile, used only for the read-only copy. |
+
+## Development
+
+The tests use the standard library's `unittest`. They put all data in a temporary folder, start a throwaway `anki.syncserver` for the sync tests, and never touch your real config or collections.
+
+```bash
+~/.local/share/agent-focus/venv/bin/python3 -m unittest discover -s tests -v
+```
+
+Without the `anki` package, the sync tests are skipped and the rest still run.
 
 ## Uninstall
 
 ```bash
 ./uninstall.sh
 ```
+
+This removes the LaunchAgent, the CLI link, and the agent hooks. Your config, notes, and synced collection stay in `~/.local/share`.
 
 ## License
 

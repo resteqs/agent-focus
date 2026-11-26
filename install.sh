@@ -5,21 +5,21 @@ REPO_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 DATA_DIR="${AGENT_FOCUS_DATA_DIR:-$HOME/.local/share/agent-focus}"
 BIN_DIR="$HOME/.local/bin"
 PLIST_PATH="$HOME/Library/LaunchAgents/com.agent-focus.daemon.plist"
-LEGACY_PLIST="$HOME/Library/LaunchAgents/com.antoni.agent-focus.plist"
 PY_BIN="$(command -v python3 || echo /opt/homebrew/bin/python3)"
 VENV_DIR="$DATA_DIR/venv"
 
 mkdir -p "$DATA_DIR" "$BIN_DIR" "$HOME/Library/LaunchAgents"
 chmod +x "$REPO_DIR/server.py" "$REPO_DIR/hooks/hook.sh" "$REPO_DIR/hooks/hook_dispatch.py" "$REPO_DIR/bin/agent-focus"
 
-# Set up lightweight venv with official headless `anki` package unless disabled
+# Optional venv with the `anki` package for direct AnkiWeb sync. AGENT_FOCUS_NO_VENV=1 skips it.
+ANKI_WARNING="Could not install the anki package. Agent Focus will run without direct AnkiWeb sync."
 if [ "${AGENT_FOCUS_NO_VENV:-0}" != "1" ]; then
   if command -v uv >/dev/null 2>&1; then
-    (uv venv --python 3.12 "$VENV_DIR" 2>/dev/null || uv venv "$VENV_DIR") && \
-      uv pip install --python "$VENV_DIR/bin/python3" -r "$REPO_DIR/requirements.txt" || true
+    { uv venv --python 3.12 "$VENV_DIR" 2>/dev/null || uv venv "$VENV_DIR"; } && \
+      uv pip install --python "$VENV_DIR/bin/python3" -r "$REPO_DIR/requirements.txt" || echo "$ANKI_WARNING"
   elif [ ! -x "$VENV_DIR/bin/python3" ]; then
     "$PY_BIN" -m venv "$VENV_DIR" 2>/dev/null && \
-      "$VENV_DIR/bin/pip" install --quiet -r "$REPO_DIR/requirements.txt" || true
+      "$VENV_DIR/bin/pip" install --quiet -r "$REPO_DIR/requirements.txt" || echo "$ANKI_WARNING"
   fi
   if [ -x "$VENV_DIR/bin/python3" ]; then
     PY_BIN="$VENV_DIR/bin/python3"
@@ -34,12 +34,6 @@ fi
 
 # Symlink CLI into ~/.local/bin
 ln -sf "$REPO_DIR/bin/agent-focus" "$BIN_DIR/agent-focus"
-
-# Unload legacy plist if present
-if [ -f "$LEGACY_PLIST" ]; then
-  launchctl bootout "gui/$(id -u)" "$LEGACY_PLIST" 2>/dev/null || true
-  rm -f "$LEGACY_PLIST"
-fi
 
 # Write LaunchAgent pointing to this checkout
 cat > "$PLIST_PATH" <<PLIST
@@ -90,7 +84,7 @@ def save_atomic(path: Path, data: dict) -> None:
 
 def replace_or_add_group(hooks_map: dict, event: str, cmd: str, extra: dict | None = None) -> None:
     entries = hooks_map.setdefault(event, [])
-    # Update any previous agent-focus hook path in place
+    # Repoint an existing agent-focus hook (e.g. after moving the checkout) instead of adding a second one.
     for entry in entries:
         for h in entry.get("hooks", []):
             c = str(h.get("command", ""))
@@ -140,3 +134,4 @@ PY
 echo ""
 echo "Agent Focus installed and running at http://127.0.0.1:7842"
 echo "Try: agent-focus demo"
+echo "Sync flashcards without Anki Desktop: agent-focus anki login"

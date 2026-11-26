@@ -1,11 +1,10 @@
 #!/bin/sh
-# CLI helper for Agent Focus (http://127.0.0.1:7842)
+# Command-line control for the Agent Focus daemon.
 
 PORT="${AGENT_FOCUS_PORT:-7842}"
 BASE="http://127.0.0.1:${PORT}"
 DATA_DIR="${AGENT_FOCUS_DATA_DIR:-$HOME/.local/share/agent-focus}"
 PLIST="$HOME/Library/LaunchAgents/com.agent-focus.daemon.plist"
-LEGACY_PLIST="$HOME/Library/LaunchAgents/com.antoni.agent-focus.plist"
 VENV_PY="$DATA_DIR/venv/bin/python3"
 if [ -x "$VENV_PY" ]; then
   PY_BIN="$VENV_PY"
@@ -55,17 +54,19 @@ case "${1:-status}" in
         "$PY_BIN" - "$BASE" "$ENDPOINT" <<'PY'
 import getpass, json, sys, urllib.error, urllib.request
 base, endpoint = sys.argv[1], sys.argv[2]
-email = input("AnkiWeb email (or username): ").strip()
-password = getpass.getpass("Password (never saved to disk): ")
+email = input("AnkiWeb email or sync server username: ").strip()
+password = getpass.getpass("Password (not stored): ")
 payload = json.dumps({"email": email, "password": password, "endpoint": endpoint}).encode("utf-8")
 req = urllib.request.Request(f"{base}/api/anki/login", data=payload, headers={"Content-Type": "application/json"}, method="POST")
 try:
     with urllib.request.urlopen(req, timeout=120) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-        print("Signed in and synced:", json.dumps(data, indent=2))
+        account = json.loads(resp.read().decode("utf-8"))["account"]
+    print(f"Signed in as {account['account']} on {account['endpoint_label']}. Collection synced.")
 except urllib.error.HTTPError as e:
-    print("Login failed:", e.read().decode("utf-8", errors="ignore"), file=sys.stderr)
-    sys.exit(1)
+    error = json.loads(e.read().decode("utf-8", errors="replace") or "{}").get("error", e.reason)
+    sys.exit(f"Sign-in failed: {error}")
+except urllib.error.URLError:
+    sys.exit("Agent Focus is not running. Start it with: agent-focus restart")
 PY
         ;;
       sync)
@@ -95,20 +96,20 @@ PY
     ) >/dev/null 2>&1 &
     ;;
   restart)
-    if [ -f "$PLIST" ]; then
-      launchctl kickstart -k "gui/$(id -u)/com.agent-focus.daemon" 2>/dev/null || {
-        launchctl bootout "gui/$(id -u)" "$PLIST" 2>/dev/null || true
-        launchctl bootstrap "gui/$(id -u)" "$PLIST"
-      }
-    elif [ -f "$LEGACY_PLIST" ]; then
-      launchctl kickstart -k "gui/$(id -u)/com.antoni.agent-focus" 2>/dev/null || true
+    if [ ! -f "$PLIST" ]; then
+      echo "No LaunchAgent found. Run ./install.sh first." >&2
+      exit 1
     fi
+    launchctl kickstart -k "gui/$(id -u)/com.agent-focus.daemon" 2>/dev/null || {
+      launchctl bootout "gui/$(id -u)" "$PLIST" 2>/dev/null || true
+      launchctl bootstrap "gui/$(id -u)" "$PLIST"
+    }
     echo "Restarted Agent Focus."
     ;;
   logs)
     tail -n 40 "$DATA_DIR/server.log" 2>/dev/null || echo "No logs yet."
     ;;
   *)
-    echo "Usage: agent-focus [status|anki [status|login|sync|logout]|demo [secs]|on|off|clear|pause [mins]|resume|open|restart|logs]"
+    echo "Usage: agent-focus [status|anki [status|login [--endpoint URL]|sync|logout]|demo [secs]|on|off|clear|pause [mins]|resume|open|restart|logs]"
     ;;
 esac

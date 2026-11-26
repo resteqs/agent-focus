@@ -1,12 +1,11 @@
-"""ankistore.py — shared headless Anki layer (official `anki` package, Rust backend, zero Qt).
+"""Headless Anki collection for Agent Focus, built on the official `anki` package (no Qt).
 
-Supports both reviewing (FSRS/SM-2 scheduler) and idempotent note creation/upsert.
-Uses an isolated local collection + auth.json (chmod 600, hkey + endpoint only; never stores password).
-NEVER opens Anki Desktop's User 1/collection.anki2.
+Keeps its own collection and auth.json under `<home>/<profile>/`, never Anki Desktop's.
+auth.json holds the sync key and endpoint, never the password, and is created 0600.
 
     store = AnkiStore(home="~/.local/share/anki-headless", profile="agent-focus")
-    store.login(email, password)        # once; persists hkey + endpoint only
-    store.sync(on_conflict="download")  # pull collection + media silently
+    store.login(email, password)
+    store.sync(on_conflict="download")
     with store.session() as col:
         card = store.next_card(col)
 """
@@ -17,7 +16,6 @@ import fcntl
 import json
 import os
 import re
-import stat
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,24 +23,25 @@ from typing import Any, Iterator, Sequence
 
 try:
     from anki.collection import Collection
-    from anki.errors import SyncError
+    from anki.errors import SyncError, SyncErrorKind
     from anki.scheduler.v3 import CardAnswer
     from anki.sync import SyncAuth
     from anki.sync_pb2 import SyncCollectionResponse as _SCR
 
     ANKI_AVAILABLE = True
     RATING = {1: CardAnswer.AGAIN, 2: CardAnswer.HARD, 3: CardAnswer.GOOD, 4: CardAnswer.EASY}
-except ImportError:  # pragma: no cover - allows stdlib-only fallback
+except ImportError:  # the server still runs on stdlib Python, with AnkiConnect or the offline snapshot
     ANKI_AVAILABLE = False
     Collection = Any  # type: ignore[misc,assignment]
     SyncError = RuntimeError  # type: ignore[misc,assignment]
     SyncAuth = Any  # type: ignore[misc,assignment]
-    _SCR = None  # type: ignore[assignment]
     RATING = {}
+
+FULL_SYNC_KINDS = ("FULL_SYNC", "FULL_UPLOAD", "FULL_DOWNLOAD")
 
 
 class FullSyncConflict(RuntimeError):
-    """Local and server diverged in schema; caller must pick upload or download explicitly."""
+    """Local and server collections diverged; the caller must pick upload or download."""
 
 
 @dataclass
@@ -57,18 +56,29 @@ class DueCard:
     counts: tuple[int, int, int]  # (new, learning, review)
 
 
-def _strip_bidi(text: str) -> str:
-    return text.replace("\u2068", "").replace("\u2069", "").strip()
+def is_auth_error(exc: BaseException) -> bool:
+    return ANKI_AVAILABLE and isinstance(exc, SyncError) and exc.kind == SyncErrorKind.AUTH
 
 
-def _split_rendered_answer(answer_html: str) -> str:
-    cleaned = re.sub(r"<style\b[^>]*>.*?</style>", "", answer_html, flags=re.I | re.S)
+def strip_bidi(text: str) -> str:
+    """Anki wraps interval labels like "10m" in Unicode isolates; the UI wants plain text."""
+    return text.replace("⁨", "").replace("⁩", "").strip()
+
+
+def strip_style(markup: str) -> str:
+    return re.sub(r"<(style|script)\b[^>]*>.*?</\1>", "", markup, flags=re.I | re.S).strip()
+
+
+def split_rendered_answer(answer_html: str) -> str:
+    """Return only the back side of a rendered answer (the part after <hr id=answer>)."""
+    cleaned = strip_style(answer_html)
     parts = re.split(r"<hr\b[^>]*id=['\"]?answer['\"]?[^>]*>", cleaned, maxsplit=1, flags=re.I)
-    return parts[1].strip() if len(parts) == 2 else cleaned.strip()
+    return parts[1].strip() if len(parts) == 2 else cleaned
 
 
-def _strip_style(html_str: str) -> str:
-    return re.sub(r"<style\b[^>]*>.*?</style>", "", html_str, flags=re.I | re.S).strip()
+def _require_anki() -> None:
+    if not ANKI_AVAILABLE:
+        raise RuntimeError("The 'anki' Python package is not installed.")
 
 
 class AnkiStore:
@@ -88,112 +98,96 @@ class AnkiStore:
         self.lock_path = self.home / ".lock"
         self.endpoint = (endpoint or os.environ.get("ANKI_SYNC_ENDPOINT") or "").strip() or None
 
-    # ---------------------------------------------------------------- auth
-    def _save_auth(self, hkey: str, endpoint: str | None, email: str | None = None) -> None:
+    # auth
+
+    def _read_auth(self) -> dict[str, Any]:
+        try:
+            data = json.loads(self.auth_path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, ValueError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def _save_auth(self, hkey: str, endpoint: str | None, account: str = "") -> None:
         payload: dict[str, Any] = {"hkey": hkey, "endpoint": endpoint or None}
-        if email:
-            payload["account"] = email
-        self.auth_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-        os.chmod(self.auth_path, stat.S_IRUSR | stat.S_IWUSR)
+        if account:
+            payload["account"] = account
+        fd = os.open(self.auth_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(payload, indent=2) + "\n")
+        os.chmod(self.auth_path, 0o600)  # O_CREAT's mode is ignored when the file already exists
 
     def auth_info(self) -> dict[str, Any]:
-        if not self.auth_path.exists():
-            return {
-                "available": ANKI_AVAILABLE,
-                "signed_in": False,
-                "endpoint": self.endpoint,
-                "account": "",
-                "profile": self.profile,
-                "has_collection": self.col_path.exists(),
-            }
-        try:
-            d = json.loads(self.auth_path.read_text(encoding="utf-8"))
-            signed = bool(d.get("hkey"))
-            ep = d.get("endpoint") or self.endpoint or None
-            return {
-                "available": ANKI_AVAILABLE,
-                "signed_in": signed,
-                "endpoint": ep,
-                "account": str(d.get("account") or ""),
-                "profile": self.profile,
-                "has_collection": self.col_path.exists(),
-            }
-        except Exception:
-            return {
-                "available": ANKI_AVAILABLE,
-                "signed_in": False,
-                "endpoint": self.endpoint,
-                "account": "",
-                "profile": self.profile,
-                "has_collection": self.col_path.exists(),
-            }
+        saved = self._read_auth()
+        return {
+            "available": ANKI_AVAILABLE,
+            "signed_in": bool(saved.get("hkey")),
+            "endpoint": saved.get("endpoint") or self.endpoint,
+            "account": str(saved.get("account") or ""),
+            "profile": self.profile,
+            "has_collection": self.col_path.exists(),
+        }
 
     def is_authenticated(self) -> bool:
-        return ANKI_AVAILABLE and bool(self.auth_info().get("signed_in"))
+        return ANKI_AVAILABLE and bool(self._read_auth().get("hkey"))
 
     def login(self, user: str, password: str, endpoint: str | None = None) -> SyncAuth:
-        """Password is used once and discarded; only hkey (+endpoint) hits disk, chmod 600."""
-        if not ANKI_AVAILABLE:
-            raise RuntimeError("The 'anki' Python package is not installed.")
-        ep = (endpoint if endpoint is not None else self.endpoint) or None
-        if isinstance(ep, str):
-            ep = ep.strip() or None
+        """Exchange the password for a sync key. Only the key and endpoint are written to disk."""
+        _require_anki()
+        ep = ((self.endpoint if endpoint is None else endpoint) or "").strip() or None
+        user = user.strip()
         with self.session() as col:
-            auth = col.sync_login(username=user.strip(), password=password, endpoint=ep)
-        self._save_auth(auth.hkey, auth.endpoint or ep, email=user.strip())
+            auth = col.sync_login(username=user, password=password, endpoint=ep)
+        self._save_auth(auth.hkey, auth.endpoint or ep, account=user)
         return auth
 
     def logout(self) -> None:
-        with contextlib.suppress(FileNotFoundError):
-            self.auth_path.unlink()
+        self.auth_path.unlink(missing_ok=True)
 
     def auth(self) -> SyncAuth:
-        if not ANKI_AVAILABLE:
-            raise RuntimeError("The 'anki' Python package is not installed.")
-        d = json.loads(self.auth_path.read_text(encoding="utf-8"))
-        a = SyncAuth(hkey=d["hkey"])
-        ep = d.get("endpoint") or self.endpoint
-        if ep:
-            a.endpoint = ep
-        return a
+        _require_anki()
+        saved = self._read_auth()
+        auth = SyncAuth(hkey=saved["hkey"])
+        endpoint = saved.get("endpoint") or self.endpoint
+        if endpoint:
+            auth.endpoint = endpoint
+        return auth
 
-    # ---------------------------------------------------------------- session
+    # session
+
     @contextlib.contextmanager
     def session(self) -> Iterator[Collection]:
-        """Exclusive cross-process lock (a collection is single-writer) + open/close."""
-        if not ANKI_AVAILABLE:
-            raise RuntimeError("The 'anki' Python package is not installed.")
+        """Open the collection under an exclusive cross-process lock (collections are single-writer)."""
+        _require_anki()
         self.home.mkdir(parents=True, exist_ok=True)
-        with open(self.lock_path, "w") as lf:
-            fcntl.flock(lf, fcntl.LOCK_EX)
+        with open(self.lock_path, "w") as lock_file:
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
             col = Collection(str(self.col_path))
             try:
                 yield col
             finally:
+                # close() raises when a failed full sync left the collection closed;
+                # don't let that mask the original error.
                 with contextlib.suppress(Exception):
                     col.close()
-                fcntl.flock(lf, fcntl.LOCK_UN)
 
-    # ---------------------------------------------------------------- sync
+    # sync
+
     def sync(self, *, media: bool = True, on_conflict: str = "raise", timeout: float = 600) -> dict[str, Any]:
-        """Silent two-way sync. on_conflict: raise | upload | download (only used for FULL_SYNC).
-
-        rslib runs media sync on a background thread; poll media_sync_status().active before closing.
-        """
+        """Two-way sync with no GUI. on_conflict (raise | upload | download) only applies to FULL_SYNC."""
         auth = self.auth()
-        saved_account = str(self.auth_info().get("account") or "")
+        account = str(self._read_auth().get("account") or "")
         with self.session() as col:
             out = col.sync_collection(auth, sync_media=media)
             if out.new_endpoint:
                 auth.endpoint = out.new_endpoint
-                self._save_auth(auth.hkey, auth.endpoint, email=saved_account or None)
-            req = out.required
-            if req in (_SCR.FULL_SYNC, _SCR.FULL_UPLOAD, _SCR.FULL_DOWNLOAD):
+                self._save_auth(auth.hkey, auth.endpoint, account=account)
+            required = _SCR.ChangesRequired.Name(out.required)
+            if required in FULL_SYNC_KINDS:
                 upload = {
-                    _SCR.FULL_UPLOAD: True,
-                    _SCR.FULL_DOWNLOAD: False,
-                    _SCR.FULL_SYNC: {"upload": True, "download": False}.get(on_conflict),
-                }[req]
+                    "FULL_UPLOAD": True,
+                    "FULL_DOWNLOAD": False,
+                    "FULL_SYNC": {"upload": True, "download": False}.get(on_conflict),
+                }[required]
                 if upload is None:
                     raise FullSyncConflict("Collection diverged; choose download or upload explicitly.")
                 col.close_for_full_sync()
@@ -206,18 +200,17 @@ class AnkiStore:
             elif media:
                 col.sync_media(auth)
             if media:
-                t0 = time.time()
+                # rslib syncs media on a background thread; wait for it before closing.
+                started = time.time()
                 while col.media_sync_status().active:
-                    if time.time() - t0 > timeout:
+                    if time.time() - started > timeout:
                         col.abort_media_sync()
                         raise TimeoutError("Media sync timed out")
                     time.sleep(0.1)
-            return {
-                "required": _SCR.ChangesRequired.Name(req),
-                "server_message": out.server_message,
-            }
+            return {"required": required, "server_message": out.server_message}
 
-    # ---------------------------------------------------------------- notes (creation / upsert API)
+    # notes
+
     @staticmethod
     def ensure_notetype(
         col: Collection,
@@ -226,17 +219,17 @@ class AnkiStore:
         qfmt: str,
         afmt: str,
         css: str = "",
-        template_name: str = "Karte 1",
+        template_name: str = "Card 1",
     ) -> Any:
-        nt = col.models.by_name(name)
-        if nt:
-            return nt
+        existing = col.models.by_name(name)
+        if existing:
+            return existing
         nt = col.models.new(name)
-        for f in fields:
-            col.models.add_field(nt, col.models.new_field(f))
-        t = col.models.new_template(template_name)
-        t["qfmt"], t["afmt"] = qfmt, afmt
-        col.models.add_template(nt, t)
+        for field in fields:
+            col.models.add_field(nt, col.models.new_field(field))
+        template = col.models.new_template(template_name)
+        template["qfmt"], template["afmt"] = qfmt, afmt
+        col.models.add_template(nt, template)
         nt["css"] = css
         col.models.add(nt)
         return col.models.by_name(name)
@@ -251,61 +244,61 @@ class AnkiStore:
         tags: Sequence[str],
         id_tag: str,
     ) -> str:
-        """Idempotent by unique tag `id_tag`. Returns added | updated | unchanged."""
+        """Create or update the note tagged `id_tag`. Returns added | updated | unchanged."""
+        wanted_tags = set(tags) | {id_tag}
         ids = col.find_notes(f'tag:"{id_tag}"')
-        if ids:
-            note = col.get_note(ids[0])
-            changed = any(note[k] != v for k, v in fields.items())
-            for k, v in fields.items():
-                note[k] = v
-            want = set(tags) | {id_tag}
-            if want - set(note.tags):
-                note.tags = sorted(set(note.tags) | want)
-                changed = True
-            if changed:
-                col.update_note(note)
-            return "updated" if changed else "unchanged"
-        did = col.decks.id(deck, create=True)
-        note = col.new_note(col.models.by_name(notetype))
-        for k, v in fields.items():
-            note[k] = v
-        note.tags = sorted(set(tags) | {id_tag})
-        col.add_note(note, did)
-        return "added"
+        if not ids:
+            note = col.new_note(col.models.by_name(notetype))
+            for key, value in fields.items():
+                note[key] = value
+            note.tags = sorted(wanted_tags)
+            col.add_note(note, col.decks.id(deck, create=True))
+            return "added"
+        note = col.get_note(ids[0])
+        changed = any(note[key] != value for key, value in fields.items())
+        for key, value in fields.items():
+            note[key] = value
+        if wanted_tags - set(note.tags):
+            note.tags = sorted(set(note.tags) | wanted_tags)
+            changed = True
+        if changed:
+            col.update_note(note)
+        return "updated" if changed else "unchanged"
 
-    # ---------------------------------------------------------------- review (Agent Focus API)
+    # review
+
     @staticmethod
     def next_card(col: Collection, deck: str | None = None) -> DueCard | None:
         if deck:
             col.decks.select(col.decks.id(deck))
-        q = col.sched.get_queued_cards(fetch_limit=1)
-        if not q.cards:
+        queued = col.sched.get_queued_cards(fetch_limit=1)
+        if not queued.cards:
             return None
-        qc = q.cards[0]
-        card = col.get_card(qc.card.id)
+        top = queued.cards[0]
+        card = col.get_card(top.card.id)
         card.start_timer()
-        ro = card.render_output(browser=False)
+        rendered = card.render_output(browser=False)
         return DueCard(
             card_id=card.id,
             note_id=card.nid,
-            queue={0: "new", 1: "learning", 2: "review"}.get(qc.queue, "review"),
-            front_html=_strip_style(ro.question_text),
-            back_html=_split_rendered_answer(ro.answer_text),
-            css=ro.css,
-            buttons=[_strip_bidi(b) for b in col.sched.describe_next_states(qc.states)],
-            counts=(q.new_count, q.learning_count, q.review_count),
+            queue={0: "new", 1: "learning", 2: "review"}.get(top.queue, "review"),
+            front_html=strip_style(rendered.question_text),
+            back_html=split_rendered_answer(rendered.answer_text),
+            css=rendered.css,
+            buttons=[strip_bidi(b) for b in col.sched.describe_next_states(top.states)],
+            counts=(queued.new_count, queued.learning_count, queued.review_count),
         )
 
     @staticmethod
     def answer(col: Collection, card_id: int, rating: int, millis: int = 0) -> None:
-        """rating 1..4 = Again/Hard/Good/Easy via the exact rslib scheduler (SM-2 or FSRS)."""
+        """Rate 1..4 (Again/Hard/Good/Easy) with the collection's own scheduler, SM-2 or FSRS."""
         card = col.get_card(card_id)
         card.start_timer()
         states = col._backend.get_scheduling_states(card_id)
-        ans = col.sched.build_answer(card=card, states=states, rating=RATING[rating])
+        answer = col.sched.build_answer(card=card, states=states, rating=RATING[rating])
         if millis:
-            ans.milliseconds_taken = millis
-        col.sched.answer_card(ans)
+            answer.milliseconds_taken = millis
+        col.sched.answer_card(answer)
 
     @staticmethod
     def reviewed_today(col: Collection) -> int:
@@ -314,104 +307,71 @@ class AnkiStore:
 
     @staticmethod
     def deck_stats(col: Collection) -> list[dict[str, Any]]:
-        """Flatten deck_due_tree() into sorted per-deck stats matching Agent Focus UI schema."""
-        tree = col.sched.deck_due_tree()
-        decks_out: list[dict[str, Any]] = []
+        decks: list[dict[str, Any]] = []
 
         def walk(node: Any, prefix: str = "") -> None:
-            for ch in node.children:
-                full_name = f"{prefix}::{ch.name}" if prefix else ch.name
-                total = int(getattr(ch, "total_in_deck", 0))
-                if full_name == "Default" and total == 0 and not ch.children:
+            for child in node.children:
+                name = f"{prefix}::{child.name}" if prefix else child.name
+                total = int(child.total_in_deck)
+                if name == "Default" and total == 0 and not child.children:
                     continue
-                decks_out.append(
+                decks.append(
                     {
-                        "name": full_name,
-                        "label": full_name.replace("::", " / "),
+                        "name": name,
+                        "label": name.replace("::", " / "),
                         "count": total,
-                        "due": int(ch.review_count) + int(ch.learn_count),
-                        "new": int(ch.new_count),
+                        "due": int(child.review_count) + int(child.learn_count),
+                        "new": int(child.new_count),
                     }
                 )
-                if ch.children:
-                    walk(ch, full_name)
+                walk(child, name)
 
-        walk(tree)
-        decks_out.sort(key=lambda d: d["name"].lower())
-        return decks_out
+        walk(col.sched.deck_due_tree())
+        decks.sort(key=lambda d: d["name"].lower())
+        return decks
 
-    def get_cards_payload(
-        self,
-        deck_filter: str = "ALL",
-        study_mode: str = "due",
-        limit: int = 80,
-    ) -> dict[str, Any]:
-        """Build the full cards + decks + counters payload for Agent Focus."""
+    def get_cards_payload(self, deck_filter: str = "ALL", study_mode: str = "due", limit: int = 80) -> dict[str, Any]:
         with self.session() as col:
-            decks_out = self.deck_stats(col)
-            reviewed_today = self.reviewed_today(col)
-
-            all_ids = list(col.find_cards("-is:suspended"))
-            all_due_ids = list(col.find_cards("(is:due OR is:learn) -is:suspended"))
-            all_new_ids = list(col.find_cards("is:new -is:suspended"))
-
             deck_q = ""
             if deck_filter and deck_filter != "ALL":
-                safe_deck = deck_filter.replace('"', '\\"')
-                deck_q = f'deck:"{safe_deck}" '
-
+                deck_q = 'deck:"{}" '.format(deck_filter.replace('"', '\\"'))
             if study_mode == "all":
                 target_ids = list(col.find_cards(f"{deck_q}-is:suspended"))
             else:
-                due_ids = list(col.find_cards(f"{deck_q}(is:due OR is:learn) -is:suspended"))
-                new_ids = list(col.find_cards(f"{deck_q}is:new -is:suspended"))
-                target_ids = due_ids + new_ids
+                target_ids = list(col.find_cards(f"{deck_q}(is:due OR is:learn) -is:suspended"))
+                target_ids += col.find_cards(f"{deck_q}is:new -is:suspended")
 
-            selected_ids = target_ids[:limit]
-            cards_out: list[dict[str, Any]] = []
-            for cid in selected_ids:
+            cards = []
+            for cid in target_ids[:limit]:
                 card = col.get_card(cid)
                 deck_raw = col.decks.name(card.did)
-                nt = card.note_type()
-                nt_name = nt["name"] if nt else "Basic"
-                ro = card.render_output(browser=False)
-                front_html = _strip_style(ro.question_text)
-                back_html = _split_rendered_answer(ro.answer_text)
-                try:
-                    states = col._backend.get_scheduling_states(cid)
-                    next_reviews = [_strip_bidi(b) for b in col.sched.describe_next_states(states)]
-                except Exception:
-                    next_reviews = []
-
-                cards_out.append(
+                rendered = card.render_output(browser=False)
+                states = col._backend.get_scheduling_states(cid)
+                cards.append(
                     {
                         "id": str(card.id),
                         "nid": str(card.nid),
                         "deck": deck_raw.replace("::", " / "),
                         "deck_raw": deck_raw,
-                        "notetype": nt_name,
+                        "notetype": card.note_type()["name"],
                         "queue": int(card.queue),
                         "ivl": int(card.ivl),
                         "reps": int(card.reps),
-                        "front": front_html,
-                        "back": back_html,
-                        "next_reviews": next_reviews,
+                        "front": strip_style(rendered.question_text),
+                        "back": split_rendered_answer(rendered.answer_text),
+                        "next_reviews": [strip_bidi(b) for b in col.sched.describe_next_states(states)],
                     }
                 )
 
-            info = self.auth_info()
             return {
                 "source": "headless",
-                "ankiconnect": True,
-                "anki_mode": "headless",
-                "anki_endpoint": info.get("endpoint") or "AnkiWeb",
-                "anki_account": info.get("account") or "",
+                "anki_endpoint": self.auth_info()["endpoint"] or "AnkiWeb",
                 "study_mode": study_mode,
-                "decks": decks_out,
-                "total_cards": len(all_ids),
-                "total_due": len(all_due_ids),
-                "total_new": len(all_new_ids),
-                "filtered_count": len(cards_out),
-                "reviewed_today": reviewed_today,
-                "cards": cards_out,
+                "decks": self.deck_stats(col),
+                "total_cards": len(col.find_cards("-is:suspended")),
+                "total_due": len(col.find_cards("(is:due OR is:learn) -is:suspended")),
+                "total_new": len(col.find_cards("is:new -is:suspended")),
+                "filtered_count": len(cards),
+                "reviewed_today": self.reviewed_today(col),
+                "cards": cards,
             }
