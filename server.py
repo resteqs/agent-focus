@@ -47,7 +47,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "session_ttl_seconds": 1500,
     "default_bypass_seconds": 120,
     "bypass_cooldown_seconds": 30,
-    "auto_restore": True,
+    "auto_restore": False,
+    "return_app": "Orca",
     "completion_chime": True,
     "obsidian_note_path": "",
     "anki_profile_dir": str(Path.home() / "Library/Application Support/Anki2/User 1"),
@@ -135,6 +136,7 @@ class FocusState:
         self.anki_cache: dict[str, Any] = {"mtime": 0.0, "decks": [], "cards": []}
         self.anki_progress: dict[str, Any] = self._load_anki_progress()
         self._anki_sync_timer: threading.Timer | None = None
+        self._anki_dirty: bool = False
 
     def _load_config(self) -> dict[str, Any]:
         cfg = dict(DEFAULT_CONFIG)
@@ -167,10 +169,25 @@ class FocusState:
             try:
                 data = json.loads(ANKI_PROGRESS_PATH.read_text(encoding="utf-8"))
                 if isinstance(data, dict):
+                    data.setdefault("day", datetime.now().strftime("%Y-%m-%d"))
+                    data.setdefault("reviewed_today", 0)
+                    data.setdefault("xp_today", 0)
+                    data.setdefault("combo", 0)
+                    data.setdefault("streak_days", 0)
+                    data.setdefault("last_study_day", "")
+                    data.setdefault("cards", {})
                     return data
             except Exception:
                 pass
-        return {"day": datetime.now().strftime("%Y-%m-%d"), "reviewed_today": 0, "cards": {}}
+        return {
+            "day": datetime.now().strftime("%Y-%m-%d"),
+            "reviewed_today": 0,
+            "xp_today": 0,
+            "combo": 0,
+            "streak_days": 0,
+            "last_study_day": "",
+            "cards": {},
+        }
 
     def _save_anki_progress(self) -> None:
         ANKI_PROGRESS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -218,9 +235,12 @@ class FocusState:
             changed = True
 
         now_active = bool(self.sessions) or self.manual_focus
-        if was_active and not now_active and self.intercept_started:
-            self.intercept_started.clear()
-            changed = True
+        if was_active and not now_active:
+            if self.intercept_started:
+                self.intercept_started.clear()
+                changed = True
+            if self._anki_dirty:
+                threading.Thread(target=self.flush_anki_sync, daemon=True).start()
 
         today = datetime.now().strftime("%Y-%m-%d")
         if self.intercept_day != today:
@@ -409,7 +429,8 @@ class FocusState:
                 "intercept_count_today": self.intercept_count_today,
                 "last_intercept": self.last_intercept,
                 "config": {
-                    "auto_restore": bool(self.config.get("auto_restore", True)),
+                    "auto_restore": bool(self.config.get("auto_restore", False)),
+                    "return_app": str(self.config.get("return_app") or "Orca"),
                     "completion_chime": bool(self.config.get("completion_chime", True)),
                     "default_bypass_seconds": int(self.config.get("default_bypass_seconds", 120)),
                     "bypass_cooldown_seconds": cooldown,
@@ -459,22 +480,89 @@ class FocusState:
 
         return re.sub(r"\{\{c(\d+)::([^:}]+)(?:::([^}]+))?\}\}", repl, text)
 
+    def flush_anki_sync(self, only_if_dirty: bool = True) -> bool:
+        with self.lock:
+            if only_if_dirty and not self._anki_dirty:
+                return True
+            if self._anki_sync_timer:
+                self._anki_sync_timer.cancel()
+                self._anki_sync_timer = None
+            self._anki_dirty = False
+        try:
+            ankiconnect("sync", timeout=10.0)
+            log("AnkiConnect AnkiWeb sync complete.")
+            return True
+        except Exception as e:
+            log(f"AnkiConnect sync skipped: {e}")
+            return False
+
     def _schedule_ankiconnect_sync(self) -> None:
         with self.lock:
+            self._anki_dirty = True
             if self._anki_sync_timer:
                 self._anki_sync_timer.cancel()
 
-            def _do_sync() -> None:
-                try:
-                    ankiconnect("sync", timeout=8.0)
-                    log("AnkiConnect background AnkiWeb sync complete.")
-                except Exception as e:
-                    log(f"AnkiConnect background sync skipped: {e}")
-
-            t = threading.Timer(12.0, _do_sync)
+            t = threading.Timer(10.0, self.flush_anki_sync, kwargs={"only_if_dirty": True})
             t.daemon = True
             t.start()
             self._anki_sync_timer = t
+
+    def _study_stats_locked(self) -> dict[str, int]:
+        today = datetime.now().strftime("%Y-%m-%d")
+        if self.anki_progress.get("day") != today:
+            self.anki_progress["day"] = today
+            self.anki_progress["reviewed_today"] = 0
+            self.anki_progress["xp_today"] = 0
+            self.anki_progress["combo"] = 0
+            self._save_anki_progress()
+        return {
+            "xp_today": int(self.anki_progress.get("xp_today", 0)),
+            "combo": int(self.anki_progress.get("combo", 0)),
+            "streak_days": int(self.anki_progress.get("streak_days", 0)),
+        }
+
+    def _award_study_xp_locked(self, ease: str) -> dict[str, int]:
+        today_dt = datetime.now().date()
+        today = today_dt.isoformat()
+        if self.anki_progress.get("day") != today:
+            self.anki_progress["day"] = today
+            self.anki_progress["reviewed_today"] = 0
+            self.anki_progress["xp_today"] = 0
+            self.anki_progress["combo"] = 0
+
+        last_day = str(self.anki_progress.get("last_study_day") or "")
+        if last_day != today:
+            if last_day:
+                try:
+                    prev_dt = datetime.strptime(last_day, "%Y-%m-%d").date()
+                    delta_days = (today_dt - prev_dt).days
+                    self.anki_progress["streak_days"] = (
+                        int(self.anki_progress.get("streak_days", 0)) + 1 if delta_days == 1 else 1
+                    )
+                except ValueError:
+                    self.anki_progress["streak_days"] = 1
+            else:
+                self.anki_progress["streak_days"] = 1
+            self.anki_progress["last_study_day"] = today
+
+        base_xp = {"again": 0, "hard": 10, "good": 15, "easy": 20}.get(ease, 15)
+        if ease == "again":
+            self.anki_progress["combo"] = 0
+            gained = 0
+        else:
+            combo = int(self.anki_progress.get("combo", 0)) + 1
+            self.anki_progress["combo"] = combo
+            bonus = 5 if combo >= 3 else 0
+            gained = base_xp + bonus
+            self.anki_progress["xp_today"] = int(self.anki_progress.get("xp_today", 0)) + gained
+
+        self._save_anki_progress()
+        return {
+            "gained_xp": gained,
+            "xp_today": int(self.anki_progress.get("xp_today", 0)),
+            "combo": int(self.anki_progress.get("combo", 0)),
+            "streak_days": int(self.anki_progress.get("streak_days", 0)),
+        }
 
     def _get_anki_via_connect(self, deck_filter: str, study_mode: str) -> dict[str, Any] | None:
         try:
@@ -658,17 +746,16 @@ class FocusState:
         return decks_out, cards_out
 
     def get_anki_payload(self, deck_filter: str = "ALL", study_mode: str = "due") -> dict[str, Any]:
+        with self.lock:
+            stats = self._study_stats_locked()
+
         live = self._get_anki_via_connect(deck_filter, study_mode)
         if live is not None:
+            live.update(stats)
             return live
 
         decks, cards = self._load_anki_snapshot()
         with self.lock:
-            today = datetime.now().strftime("%Y-%m-%d")
-            if self.anki_progress.get("day") != today:
-                self.anki_progress["day"] = today
-                self.anki_progress["reviewed_today"] = 0
-                self._save_anki_progress()
             reviewed_today = int(self.anki_progress.get("reviewed_today", 0))
 
         filtered = [
@@ -685,12 +772,16 @@ class FocusState:
             "total_new": 0,
             "filtered_count": len(filtered),
             "reviewed_today": reviewed_today,
+            **stats,
             "cards": filtered,
         }
 
     def record_anki_review(self, card_id: str, ease: str) -> dict[str, Any]:
         ease_map = {"again": 1, "hard": 2, "good": 3, "easy": 4}
         ease_int = ease_map.get(ease, 3)
+
+        with self.lock:
+            xp_stats = self._award_study_xp_locked(ease)
 
         try:
             res = ankiconnect("answerCards", {"answers": [{"cardId": int(card_id), "ease": ease_int}]}, timeout=2.5)
@@ -703,6 +794,7 @@ class FocusState:
                     "synced": True,
                     "source": "ankiconnect",
                     "reviewed_today": reviewed_today,
+                    **xp_stats,
                 }
         except Exception as e:
             log(f"AnkiConnect answerCards fallback: {e}")
@@ -710,10 +802,6 @@ class FocusState:
         intervals = {"again": 45, "hard": 300, "good": 86400, "easy": 86400 * 4}
         now = time.time()
         with self.lock:
-            today = datetime.now().strftime("%Y-%m-%d")
-            if self.anki_progress.get("day") != today:
-                self.anki_progress["day"] = today
-                self.anki_progress["reviewed_today"] = 0
             self.anki_progress["reviewed_today"] = int(self.anki_progress.get("reviewed_today", 0)) + 1
             cards_map = self.anki_progress.setdefault("cards", {})
             prev = cards_map.get(card_id, {})
@@ -729,6 +817,7 @@ class FocusState:
                 "synced": False,
                 "source": "offline",
                 "reviewed_today": self.anki_progress["reviewed_today"],
+                **xp_stats,
             }
 
 
@@ -1047,11 +1136,25 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/anki/sync":
-            try:
-                ankiconnect("sync", timeout=10.0)
+            qs = urllib.parse.parse_qs(parsed.query)
+            auto_only = (qs.get("auto") or ["0"])[0] == "1"
+            ok = STATE.flush_anki_sync(only_if_dirty=auto_only)
+            if ok:
                 self._send_json({"ok": True})
+            else:
+                self._send_json({"ok": False, "error": "AnkiConnect sync failed"}, status=503)
+            return
+
+        if path == "/api/focus-app":
+            app_name = str(body.get("app") or STATE.config.get("return_app") or "Orca").strip()
+            if not re.fullmatch(r"[A-Za-z0-9 ._-]{1,48}", app_name):
+                self._send_json({"ok": False, "error": "Invalid app name"}, status=400)
+                return
+            try:
+                subprocess.Popen(["/usr/bin/open", "-a", app_name])
+                self._send_json({"ok": True, "app": app_name})
             except Exception as e:
-                self._send_json({"ok": False, "error": str(e)}, status=503)
+                self._send_json({"ok": False, "error": str(e)}, status=500)
             return
 
         if path == "/api/anki/launch":

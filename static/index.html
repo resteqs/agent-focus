@@ -80,6 +80,8 @@
       --ok: oklch(0.480 0.115 152);
       --ok-ink: oklch(0.99 0.004 152);
       --ok-soft: oklch(0.935 0.030 152);
+      --easy: oklch(0.485 0.135 245);
+      --easy-soft: oklch(0.942 0.030 245);
       --danger: oklch(0.515 0.148 26);
       --danger-soft: oklch(0.945 0.028 26);
 
@@ -144,6 +146,8 @@
         --ok: oklch(0.735 0.095 152);
         --ok-ink: oklch(0.150 0.016 152);
         --ok-soft: oklch(0.265 0.036 152);
+        --easy: oklch(0.735 0.105 245);
+        --easy-soft: oklch(0.258 0.042 245);
         --danger: oklch(0.725 0.118 26);
         --danger-soft: oklch(0.275 0.036 26);
 
@@ -232,11 +236,13 @@
     }
 
     /* =====================================================================
-       REBALANCED SPLIT: compact left rail (~27%) + centered main canvas (~73%)
+       TRUE VIEWPORT-CENTERED 3-TRACK SHELL
+       Track 1: dark focus rail | Track 2: centered canvas | Track 3: right switcher
        ===================================================================== */
     .shell {
+      --rail-w: clamp(268px, 21vw, 304px);
       display: grid;
-      grid-template-columns: clamp(290px, 27%, 356px) minmax(0, 1fr);
+      grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--rail-w);
       min-height: 100dvh;
     }
 
@@ -355,7 +361,26 @@
     }
 
     .floating-card.restore-card {
-      box-shadow: 0 0 0 1.5px var(--ok);
+      box-shadow: 0 0 0 1.5px color-mix(in oklch, var(--card-ink) 22%, transparent);
+    }
+
+    .restore-subtle-link {
+      align-self: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 10px;
+      font-size: var(--text-xs);
+      color: var(--card-muted);
+      text-decoration: underline;
+      text-decoration-thickness: from-font;
+      text-underline-offset: 3px;
+      transition: color 150ms ease;
+    }
+
+    .restore-subtle-link:hover {
+      color: var(--card-ink);
     }
 
     .floating-title {
@@ -456,11 +481,11 @@
     }
 
     /* =====================================================================
-       MAIN CENTERED PAPER WORKSPACE
+       CENTERED PAPER WORKSPACE + RIGHT TASK SWITCHER RAIL
        ===================================================================== */
     .paper-pane {
       background: var(--paper-1);
-      padding: 24px clamp(24px, 5vw, 72px) 68px;
+      padding: 44px clamp(20px, 3vw, 48px) 68px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -469,46 +494,48 @@
 
     .content-col {
       width: 100%;
-      max-width: 680px;
+      max-width: 640px;
       display: flex;
       flex-direction: column;
-      gap: 26px;
+      gap: 24px;
     }
 
-    /* Floating Capsule Nav — aligned cleanly with content column */
-    .nav-header {
+    /* Right-side Task Switcher Rail */
+    .nav-rail {
+      background: var(--paper-1);
+      padding: 28px 26px;
       display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      position: sticky;
-      top: 18px;
-      z-index: var(--z-nav);
+      flex-direction: column;
+      align-items: flex-end;
     }
 
     .nav-capsule {
+      position: sticky;
+      top: 28px;
+      z-index: var(--z-nav);
       display: inline-flex;
-      align-items: center;
-      padding: 4px;
-      border-radius: 12px;
+      flex-direction: column;
+      padding: 5px;
+      border-radius: 13px;
       background: var(--paper-raised);
       box-shadow: var(--shadow-capsule);
-      max-width: 100%;
-      overflow-x: auto;
+      min-width: 152px;
     }
 
     .tabs {
-      display: inline-flex;
-      align-items: center;
+      display: flex;
+      flex-direction: column;
       gap: 2px;
     }
 
     .tab-btn {
       min-height: 44px;
-      padding: 0 16px;
-      border-radius: 8px; /* 12 - 4 */
+      padding: 0 14px;
+      border-radius: 8px; /* 13 - 5 */
       font-size: var(--text-sm);
       font-weight: var(--weight-medium);
       color: var(--ink-11);
+      text-align: start;
       white-space: nowrap;
       transition: background-color 150ms ease, color 150ms ease;
     }
@@ -676,10 +703,10 @@
       .bypass-btn.unlocked:hover { background: color-mix(in oklch, var(--card-ink) 14%, transparent); }
       .deck-trigger:hover { box-shadow: var(--shadow-control-hover); background: color-mix(in oklch, var(--paper-raised) 96%, var(--ink-12)); }
       .deck-option:hover { background: var(--paper-2); }
-      .rate-btn.again:hover { background: var(--danger-soft); color: var(--danger); box-shadow: 0 0 0 1px color-mix(in oklch, var(--danger) 40%, transparent); }
-      .rate-btn.hard:hover  { background: var(--amber-soft); color: var(--ink-12); box-shadow: 0 0 0 1px color-mix(in oklch, var(--amber) 55%, transparent); }
-      .rate-btn.good:hover  { background: var(--ok-soft); color: var(--ok); box-shadow: 0 0 0 1px color-mix(in oklch, var(--ok) 40%, transparent); }
-      .rate-btn.easy:hover  { background: var(--paper-3); color: var(--ink-12); }
+      .rate-btn.again:hover { background: var(--danger-soft); color: var(--danger); box-shadow: 0 0 0 1px color-mix(in oklch, var(--danger) 42%, transparent); }
+      .rate-btn.hard:hover  { background: var(--amber-soft); color: var(--ink-12); box-shadow: 0 0 0 1px color-mix(in oklch, var(--amber) 58%, transparent); }
+      .rate-btn.good:hover  { background: var(--ok-soft); color: var(--ok); box-shadow: 0 0 0 1px color-mix(in oklch, var(--ok) 42%, transparent); }
+      .rate-btn.easy:hover  { background: var(--easy-soft); color: var(--easy); box-shadow: 0 0 0 1px color-mix(in oklch, var(--easy) 42%, transparent); }
       .chip-remove:hover { color: var(--danger); background: var(--danger-soft); }
       .seg-btn:hover { color: var(--ink-12); }
     }
@@ -887,34 +914,67 @@
     .spec-right {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 4px;
     }
 
-    .sync-status {
+    /* Dot-only Anki connection indicator to the right of Sync with Emil hover tooltip */
+    .sync-dot-wrap {
+      position: relative;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      font-size: var(--text-xs);
-      color: var(--ink-11);
+      justify-content: center;
+      width: 28px;
+      height: 44px;
+      border-radius: 8px;
+      cursor: default;
     }
 
     .sync-dot {
-      width: 6px;
-      height: 6px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       background: var(--ink-9);
+      transition: background-color 180ms ease;
     }
 
     .sync-dot.live {
       background: var(--ok);
     }
 
-    .sync-inline-btn {
-      min-width: 86px;
+    .sync-tooltip {
+      position: absolute;
+      top: calc(100% + 2px);
+      inset-inline-end: 0;
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: var(--stage-bg);
+      color: var(--stage-ink);
+      font-size: var(--text-xs);
+      font-weight: var(--weight-medium);
+      white-space: nowrap;
+      pointer-events: none;
+      box-shadow: var(--shadow-popover);
+      transform-origin: top right;
+      opacity: 0;
+      transform: scale(0.96) translateY(-2px);
+      transition: opacity 125ms ease-out, transform 125ms ease-out;
+      z-index: var(--z-popover);
     }
 
-    /* Warm Linen Flashcard Surface */
+    .sync-dot-wrap:hover .sync-tooltip,
+    .sync-dot-wrap:focus-visible .sync-tooltip {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+
+    .sync-inline-btn {
+      min-width: 82px;
+    }
+
+    /* Warm Linen Flashcard Surface with hairline progress bar & reward glow */
     .linen-sheet {
+      position: relative;
+      overflow: hidden;
       background: var(--paper-2);
       border-radius: 14px;
       padding: 28px 30px;
@@ -924,6 +984,63 @@
       justify-content: space-between;
       gap: 18px;
       will-change: transform, opacity;
+      transition: box-shadow 260ms var(--ease-out-quart);
+    }
+
+    .sheet-progress {
+      position: absolute;
+      top: 0;
+      inset-inline: 0;
+      height: 3px;
+      background: color-mix(in oklch, var(--ink-12) 6%, transparent);
+      pointer-events: none;
+    }
+
+    .sheet-progress-fill {
+      height: 100%;
+      width: 100%;
+      background: var(--amber);
+      transform-origin: left center;
+      transform: scaleX(0);
+      transition: transform 320ms var(--ease-out-quart);
+    }
+
+    .linen-sheet.flash-good {
+      box-shadow: 0 0 0 1.5px color-mix(in oklch, var(--ok) 65%, transparent);
+    }
+
+    .linen-sheet.flash-easy {
+      box-shadow: 0 0 0 1.5px color-mix(in oklch, var(--easy) 65%, transparent);
+    }
+
+    /* Floating calm dopamine XP/encouragement whisper */
+    .xp-float {
+      position: fixed;
+      pointer-events: none;
+      z-index: var(--z-toast);
+      font-size: 13px;
+      font-weight: var(--weight-semibold);
+      letter-spacing: -0.01em;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--paper-raised);
+      box-shadow: var(--shadow-control);
+      white-space: nowrap;
+      will-change: transform, opacity;
+    }
+
+    .combo-pill {
+      color: var(--amber-ink);
+      background: var(--amber-soft);
+      padding: 1px 7px;
+      border-radius: 5px;
+      font-weight: var(--weight-medium);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .combo-pill {
+        color: var(--amber);
+      }
     }
 
     /* Subtle tactile card arrival after rating (triggered only on rate, never on page load) */
@@ -1096,6 +1213,11 @@
       font-size: var(--text-sm);
       font-weight: var(--weight-medium);
     }
+
+    .rate-btn.again strong { color: var(--danger); }
+    .rate-btn.hard strong  { color: color-mix(in oklch, var(--amber) 72%, var(--ink-12)); }
+    .rate-btn.good strong  { color: var(--ok); }
+    .rate-btn.easy strong  { color: var(--easy); }
 
     .rate-btn span {
       font-size: 11px;
@@ -1607,20 +1729,58 @@
       display: none !important;
     }
 
-    @media (max-width: 960px) {
+    @media (max-width: 1180px) {
+      .shell {
+        grid-template-columns: clamp(260px, 27%, 304px) minmax(0, 1fr);
+      }
+      .nav-rail {
+        grid-column: 2;
+        grid-row: 1;
+        padding: 20px clamp(20px, 3vw, 48px) 0;
+        align-items: flex-end;
+      }
+      .paper-pane {
+        grid-column: 2;
+        grid-row: 2;
+        padding-top: 16px;
+      }
+      .stage {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+      }
+      .nav-capsule {
+        position: static;
+        flex-direction: row;
+        min-width: 0;
+      }
+      .tabs {
+        flex-direction: row;
+      }
+    }
+
+    @media (max-width: 860px) {
       .shell {
         grid-template-columns: 1fr;
       }
       .stage {
+        grid-column: 1;
+        grid-row: 1;
         border-inline-end: 0;
         border-bottom: var(--hairline) solid var(--ink-line);
       }
+      .nav-rail {
+        grid-column: 1;
+        grid-row: 2;
+        align-items: flex-start;
+        padding: 18px 20px 0;
+      }
+      .paper-pane {
+        grid-column: 1;
+        grid-row: 3;
+        padding: 16px 20px 56px;
+      }
       .stage-upper {
         gap: 24px;
-      }
-      .nav-header {
-        justify-content: flex-start;
-        position: static;
       }
     }
 
@@ -1672,15 +1832,16 @@
           </button>
         </section>
 
-        <!-- Run Finished Restore Card -->
+        <!-- Run Finished Card — nudges back to Orca, not back to distraction -->
         <section id="restoreCard" class="floating-card restore-card">
           <div>
             <h2 class="floating-title">Run finished</h2>
-            <div id="restoreSub" class="floating-sub"></div>
+            <div id="restoreSub" class="floating-sub">Ready in Orca</div>
           </div>
-          <div class="action-row">
-            <button id="returnNowBtn" type="button" class="btn btn-ok" style="flex:1;">Back to site</button>
-            <button id="stayBtn" type="button" class="btn hidden">Stay here</button>
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <button id="focusAppBtn" type="button" class="btn btn-amber" style="width:100%;">Return to Orca</button>
+            <button id="returnNowBtn" type="button" class="restore-subtle-link hidden">or open site</button>
+            <button id="stayBtn" type="button" class="restore-subtle-link hidden">Stay here</button>
           </div>
         </section>
 
@@ -1692,21 +1853,10 @@
     </aside>
 
     <!-- ===============================================================
-         MAIN CENTERED PAPER WORKSPACE
+         CENTERED PAPER WORKSPACE
          =============================================================== -->
     <main class="paper-pane">
       <div class="content-col">
-        <header class="nav-header">
-          <div class="nav-capsule">
-            <nav class="tabs" id="tabBar" role="tablist" aria-label="Workspace modes">
-              <button id="tab-anki" type="button" class="tab-btn active" data-tab="anki" role="tab" aria-selected="true" aria-controls="panel-anki" tabindex="0">Anki</button>
-              <button id="tab-scratchpad" type="button" class="tab-btn" data-tab="scratchpad" role="tab" aria-selected="false" aria-controls="panel-scratchpad" tabindex="-1">Scratchpad</button>
-              <button id="tab-rest" type="button" class="tab-btn" data-tab="rest" role="tab" aria-selected="false" aria-controls="panel-rest" tabindex="-1">Rest</button>
-              <button id="tab-settings" type="button" class="tab-btn" data-tab="settings" role="tab" aria-selected="false" aria-controls="panel-settings" tabindex="-1">Settings</button>
-            </nav>
-          </div>
-        </header>
-
         <!-- ANKI PANEL -->
         <section id="panel-anki" class="panel active" role="tabpanel" aria-labelledby="tab-anki">
           <div class="section-head">
@@ -1743,10 +1893,6 @@
             </div>
 
             <div class="spec-right">
-              <span class="sync-status">
-                <span id="ankiSyncDot" class="sync-dot" aria-hidden="true"></span>
-                <span id="ankiSyncLabel">Connecting…</span>
-              </span>
               <button id="syncAnkiBtn" type="button" class="btn btn-ghost sync-inline-btn">
                 <span id="syncIconSwap" class="icon-swap" data-swapped="false" aria-hidden="true">
                   <svg class="icon icon-base" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
@@ -1754,10 +1900,17 @@
                 </span>
                 <span id="syncAnkiText">Sync</span>
               </button>
+              <span id="ankiDotWrap" class="sync-dot-wrap" tabindex="0" aria-label="Checking Anki connection">
+                <span id="ankiSyncDot" class="sync-dot" aria-hidden="true"></span>
+                <span id="ankiSyncTooltip" class="sync-tooltip" role="tooltip">Checking Anki…</span>
+              </span>
             </div>
           </div>
 
           <article id="ankiSheet" class="linen-sheet">
+            <div class="sheet-progress" aria-hidden="true">
+              <div id="sheetProgressFill" class="sheet-progress-fill"></div>
+            </div>
             <div id="ankiSkeleton">
               <div class="skeleton-line" style="width: 30%; height: 12px; margin-bottom: 22px;"></div>
               <div class="skeleton-line" style="width: 84%; height: 22px;"></div>
@@ -1942,6 +2095,20 @@
         </section>
       </div>
     </main>
+
+    <!-- ===============================================================
+         RIGHT TASK SWITCHER RAIL
+         =============================================================== -->
+    <aside class="nav-rail">
+      <div class="nav-capsule">
+        <nav class="tabs" id="tabBar" role="tablist" aria-label="Workspace modes">
+          <button id="tab-anki" type="button" class="tab-btn active" data-tab="anki" role="tab" aria-selected="true" aria-controls="panel-anki" tabindex="0">Anki</button>
+          <button id="tab-scratchpad" type="button" class="tab-btn" data-tab="scratchpad" role="tab" aria-selected="false" aria-controls="panel-scratchpad" tabindex="-1">Scratchpad</button>
+          <button id="tab-rest" type="button" class="tab-btn" data-tab="rest" role="tab" aria-selected="false" aria-controls="panel-rest" tabindex="-1">Rest</button>
+          <button id="tab-settings" type="button" class="tab-btn" data-tab="settings" role="tab" aria-selected="false" aria-controls="panel-settings" tabindex="-1">Settings</button>
+        </nav>
+      </div>
+    </aside>
   </div>
 
   <!-- Undo Toast -->
@@ -2209,8 +2376,8 @@
       btn.addEventListener("click", () => setActiveTab(btn.dataset.tab, false, true));
       btn.addEventListener("keydown", (e) => {
         let targetIdx = null;
-        if (e.key === "ArrowRight") targetIdx = (idx + 1) % tabButtons.length;
-        else if (e.key === "ArrowLeft") targetIdx = (idx - 1 + tabButtons.length) % tabButtons.length;
+        if (e.key === "ArrowRight" || e.key === "ArrowDown") targetIdx = (idx + 1) % tabButtons.length;
+        else if (e.key === "ArrowLeft" || e.key === "ArrowUp") targetIdx = (idx - 1 + tabButtons.length) % tabButtons.length;
         else if (e.key === "Home") targetIdx = 0;
         else if (e.key === "End") targetIdx = tabButtons.length - 1;
         if (targetIdx !== null) {
@@ -2269,9 +2436,20 @@
     if (fromDomain && fromUrl) {
       updateInterceptCopy();
       $("interceptCard").classList.add("visible");
-      $("returnNowBtn").textContent = `Back to ${fromDomain}`;
+      $("returnNowBtn").textContent = `or open ${fromDomain}`;
       updateBypassGate();
     }
+
+    $("focusAppBtn").addEventListener("click", async () => {
+      SFX.confirm();
+      cancelRestoreCountdown();
+      const app = state?.config?.return_app || "Orca";
+      await fetch("/api/focus-app", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ app }),
+      });
+    });
 
     $("bypassBtn").addEventListener("click", async () => {
       if (!fromDomain || $("bypassBtn").disabled) return;
@@ -2302,7 +2480,7 @@
       SFX.tick();
       cancelRestoreCountdown();
       $("stayBtn").classList.add("hidden");
-      $("restoreSub").textContent = "";
+      $("restoreSub").textContent = `Ready in ${state?.config?.return_app || "Orca"}`;
     });
 
     function cancelRestoreCountdown() {
@@ -2314,16 +2492,25 @@
 
     function triggerCompletionRestore() {
       SFX.agentDone();
-      announce("Agent run finished.");
-      if (!fromUrl) return;
+      const appName = state?.config?.return_app || "Orca";
+      announce(`Agent run finished. Ready in ${appName}.`);
+      $("focusAppBtn").textContent = `Return to ${appName}`;
+      $("restoreSub").textContent = `Ready in ${appName}`;
       $("restoreCard").classList.add("visible");
       $("interceptCard").classList.remove("visible");
 
-      const shouldAuto = Boolean(state?.config?.auto_restore);
+      if (fromUrl) {
+        $("returnNowBtn").textContent = `or open ${fromDomain || "site"}`;
+        $("returnNowBtn").classList.remove("hidden");
+      } else {
+        $("returnNowBtn").classList.add("hidden");
+      }
+
+      const shouldAuto = Boolean(state?.config?.auto_restore) && Boolean(fromUrl);
       if (shouldAuto && !userEngaged) {
         restoreSecondsLeft = 3;
         $("stayBtn").classList.remove("hidden");
-        $("restoreSub").textContent = `Back to ${fromDomain || "site"} in ${restoreSecondsLeft}s`;
+        $("restoreSub").textContent = `Opening ${fromDomain || "site"} in ${restoreSecondsLeft}s`;
         cancelRestoreCountdown();
         restoreCountdownTimer = setInterval(() => {
           restoreSecondsLeft -= 1;
@@ -2331,12 +2518,11 @@
             cancelRestoreCountdown();
             window.location.href = fromUrl;
           } else {
-            $("restoreSub").textContent = `Back to ${fromDomain || "site"} in ${restoreSecondsLeft}s`;
+            $("restoreSub").textContent = `Opening ${fromDomain || "site"} in ${restoreSecondsLeft}s`;
           }
         }, 1000);
       } else {
         $("stayBtn").classList.add("hidden");
-        $("restoreSub").textContent = "";
       }
     }
 
@@ -2406,6 +2592,7 @@
       const prevBlocking = state ? state.blocking : wasBlocking;
       state = next;
       bypassCooldownTotal = state.config.bypass_cooldown_seconds ?? 30;
+      $("focusAppBtn").textContent = `Return to ${state.config.return_app || "Orca"}`;
 
       const dot = $("clockDot");
       const headline = $("stageHeadline");
@@ -2719,7 +2906,10 @@
 
         const isLive = Boolean(ankiData.ankiconnect);
         $("ankiSyncDot").classList.toggle("live", isLive);
-        $("ankiSyncLabel").textContent = isLive ? "Connected" : "Anki closed";
+        const tip = isLive ? "Anki connected" : "Anki not connected";
+        $("ankiSyncTooltip").textContent = tip;
+        $("ankiDotWrap").setAttribute("aria-label", tip);
+        sessionStreak = Number(ankiData.combo || 0);
 
         const allCount = ankiStudyMode === "all"
           ? ankiData.total_cards || 0
@@ -2735,7 +2925,8 @@
         ankiLoadError = true;
         ankiCards = [];
         $("ankiSyncDot").classList.remove("live");
-        $("ankiSyncLabel").textContent = "Couldn’t reach server";
+        $("ankiSyncTooltip").textContent = "Server unreachable";
+        $("ankiDotWrap").setAttribute("aria-label", "Server unreachable");
       }
 
       $("ankiSkeleton").classList.add("hidden");
@@ -2756,9 +2947,55 @@
       });
     }
 
-    function renderAnkiCard(animateNext = false) {
+    function emitXpFloat(originEl, text, colorToken) {
+      if (prefersReducedMotion.matches || !originEl) return;
+      const rect = originEl.getBoundingClientRect();
+      const el = document.createElement("div");
+      el.className = "xp-float";
+      el.textContent = text;
+      el.style.color = colorToken;
+      el.style.left = `${rect.left + rect.width / 2}px`;
+      el.style.top = `${rect.top - 8}px`;
+      document.body.appendChild(el);
+      const anim = el.animate(
+        [
+          { transform: "translate(-50%, 4px) scale(0.92)", opacity: 0 },
+          { transform: "translate(-50%, -10px) scale(1)", opacity: 1, offset: 0.22 },
+          { transform: "translate(-50%, -28px) scale(0.98)", opacity: 0 },
+        ],
+        { duration: 760, easing: "cubic-bezier(0.165, 0.84, 0.44, 1)", fill: "forwards" }
+      );
+      anim.onfinish = () => el.remove();
+    }
+
+    function flashSheetRim(cls) {
+      if (prefersReducedMotion.matches) return;
+      const sheet = $("ankiSheet");
+      sheet.classList.remove("flash-good", "flash-easy");
+      void sheet.offsetWidth;
+      sheet.classList.add(cls);
+      setTimeout(() => sheet.classList.remove(cls), 360);
+    }
+
+    function updateStudyMetaBar() {
       const rev = ankiData?.reviewed_today || 0;
-      $("ankiReviewedMeta").textContent = `${rev} reviewed today`;
+      const xp = ankiData?.xp_today || 0;
+      const combo = ankiData?.combo || 0;
+      const streak = ankiData?.streak_days || 0;
+
+      const goal = Math.max(10, Math.min(20, (ankiData?.total_due || 0) + (ankiData?.total_new || 0) + rev || 15));
+      const pct = Math.min(1, rev / Math.max(1, goal));
+      $("sheetProgressFill").style.transform = `scaleX(${pct.toFixed(3)})`;
+
+      const parts = [`${rev} reviewed`];
+      if (xp > 0) parts.push(`${xp} XP`);
+      if (streak > 0) parts.push(`${streak}d streak`);
+      const comboHtml = combo >= 2 ? `<span class="combo-pill">${combo}x combo</span> ` : "";
+      $("ankiReviewedMeta").innerHTML = comboHtml + escapeHtml(parts.join(" · "));
+    }
+
+    function renderAnkiCard(animateNext = false) {
+      updateStudyMetaBar();
 
       if (animateNext && !prefersReducedMotion.matches) {
         const sheet = $("ankiSheet");
@@ -2856,6 +3093,7 @@
       try {
         const res = await fetch("/api/anki/sync", { method: "POST" });
         if (res.ok) {
+          ankiHasPendingSync = false;
           SFX.confirm();
           swap.setAttribute("data-swapped", "true");
           label.textContent = "Synced";
@@ -2898,43 +3136,87 @@
       }
     }
 
+    let ankiHasPendingSync = false;
+
+    function flushAnkiSyncBeacon() {
+      if (!ankiHasPendingSync) return;
+      ankiHasPendingSync = false;
+      try {
+        navigator.sendBeacon("/api/anki/sync?auto=1");
+      } catch (_) {}
+    }
+
+    window.addEventListener("pagehide", flushAnkiSyncBeacon);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") flushAnkiSyncBeacon();
+    });
+
     async function rateAnki(ease, moveFocus = false, triggerBtn = null) {
       if (!ankiCards.length || !ankiRevealed) return;
       userEngaged = true;
+      ankiHasPendingSync = true;
       const idx = ankiIndex % ankiCards.length;
       const card = ankiCards[idx];
       const origin = triggerBtn || document.querySelector(`.rate-btn[data-ease="${ease}"]`);
 
+      const baseXp = { again: 0, hard: 10, good: 15, easy: 20 }[ease] || 0;
       ankiCards.splice(idx, 1);
+
+      let nextCombo = sessionStreak;
+      let xpGain = 0;
+
       if (ease === "again") {
+        nextCombo = 0;
         sessionStreak = 0;
         SFX.rateAgain();
+        emitXpFloat(origin, "Again soon", "var(--ink-11)");
         ankiCards.splice(Math.min(2, ankiCards.length), 0, card);
-      } else if (ease === "hard") {
-        sessionStreak += 1;
-        SFX.rateHard();
-        if (ankiStudyMode === "all") ankiCards.splice(Math.min(6, ankiCards.length), 0, card);
-      } else if (ease === "good") {
-        sessionStreak += 1;
-        if (ankiCards.length === 0 || sessionStreak % 5 === 0) {
-          SFX.celebrate();
-          emitSparks(origin, ["oklch(0.75 0.17 68)", "oklch(0.56 0.13 152)", "oklch(0.84 0.12 78)"], 18);
-        } else {
-          SFX.rateGood();
-          emitSparks(origin, ["oklch(0.56 0.13 152)", "oklch(0.75 0.17 68)"], 10);
-        }
-      } else if (ease === "easy") {
-        sessionStreak += 1;
-        if (ankiCards.length === 0 || sessionStreak % 5 === 0) {
-          SFX.celebrate();
-          emitSparks(origin, ["oklch(0.75 0.17 68)", "oklch(0.56 0.13 152)", "oklch(0.86 0.11 82)"], 20);
-        } else {
-          SFX.rateEasy();
-          emitSparks(origin, ["oklch(0.75 0.17 68)", "oklch(0.86 0.11 82)", "oklch(0.56 0.13 152)"], 14);
+      } else {
+        nextCombo = sessionStreak + 1;
+        sessionStreak = nextCombo;
+        xpGain = baseXp + (nextCombo >= 3 ? 5 : 0);
+
+        if (ease === "hard") {
+          SFX.rateHard();
+          emitXpFloat(origin, `+${xpGain} XP`, "var(--amber)");
+          if (ankiStudyMode === "all") ankiCards.splice(Math.min(6, ankiCards.length), 0, card);
+        } else if (ease === "good") {
+          flashSheetRim("flash-good");
+          const isMilestone = ankiCards.length === 0 || nextCombo % 5 === 0;
+          if (isMilestone) {
+            SFX.celebrate();
+            emitSparks(origin, ["oklch(0.75 0.17 68)", "oklch(0.56 0.13 152)", "oklch(0.84 0.12 78)"], 18);
+            const msg = ankiCards.length === 0 ? `Deck clear · +${xpGain} XP` : `${nextCombo}x streak · +${xpGain} XP`;
+            emitXpFloat(origin, msg, "var(--ok)");
+          } else {
+            SFX.rateGood();
+            emitSparks(origin, ["oklch(0.56 0.13 152)", "oklch(0.75 0.17 68)"], 10);
+            const msg = nextCombo >= 3 ? `+${xpGain} XP · ${nextCombo}x` : `+${xpGain} XP`;
+            emitXpFloat(origin, msg, "var(--ok)");
+          }
+        } else if (ease === "easy") {
+          flashSheetRim("flash-easy");
+          const isMilestone = ankiCards.length === 0 || nextCombo % 5 === 0;
+          if (isMilestone) {
+            SFX.celebrate();
+            emitSparks(origin, ["oklch(0.56 0.14 242)", "oklch(0.75 0.17 68)", "oklch(0.72 0.11 236)"], 20);
+            const msg = ankiCards.length === 0 ? `Clean sweep · +${xpGain} XP` : `Effortless · ${nextCombo}x`;
+            emitXpFloat(origin, msg, "var(--easy)");
+          } else {
+            SFX.rateEasy();
+            emitSparks(origin, ["oklch(0.56 0.14 242)", "oklch(0.72 0.11 236)", "oklch(0.75 0.17 68)"], 14);
+            const msg = nextCombo >= 3 ? `Effortless · +${xpGain} XP` : `+${xpGain} XP`;
+            emitXpFloat(origin, msg, "var(--easy)");
+          }
         }
       }
 
-      if (ankiData) ankiData.reviewed_today = (ankiData.reviewed_today || 0) + 1;
+      if (ankiData) {
+        ankiData.reviewed_today = (ankiData.reviewed_today || 0) + 1;
+        ankiData.xp_today = (ankiData.xp_today || 0) + xpGain;
+        ankiData.combo = nextCombo;
+        if (!ankiData.streak_days) ankiData.streak_days = 1;
+      }
       ankiRevealed = false;
       renderAnkiCard(true);
       if (moveFocus && ankiCards.length) {
@@ -2947,9 +3229,15 @@
         body: JSON.stringify({ card_id: card.id, ease }),
       });
       const data = await res.json().catch(() => ({}));
-      if (typeof data.reviewed_today === "number" && ankiData) {
-        ankiData.reviewed_today = data.reviewed_today;
-        $("ankiReviewedMeta").textContent = `${data.reviewed_today} reviewed today`;
+      if (ankiData) {
+        if (typeof data.reviewed_today === "number") ankiData.reviewed_today = data.reviewed_today;
+        if (typeof data.xp_today === "number") ankiData.xp_today = data.xp_today;
+        if (typeof data.combo === "number") {
+          ankiData.combo = data.combo;
+          sessionStreak = data.combo;
+        }
+        if (typeof data.streak_days === "number") ankiData.streak_days = data.streak_days;
+        updateStudyMetaBar();
       }
     }
 
