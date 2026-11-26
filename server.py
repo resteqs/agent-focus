@@ -239,8 +239,6 @@ class FocusState:
             if self.intercept_started:
                 self.intercept_started.clear()
                 changed = True
-            if self._anki_dirty:
-                threading.Thread(target=self.flush_anki_sync, daemon=True).start()
 
         today = datetime.now().strftime("%Y-%m-%d")
         if self.intercept_day != today:
@@ -497,15 +495,11 @@ class FocusState:
             return False
 
     def _schedule_ankiconnect_sync(self) -> None:
+        # Reviews are already committed immediately to Anki Desktop via answerCards.
+        # Avoid calling AnkiConnect's `sync` automatically because it invokes mw.onSync(),
+        # which opens an intrusive macOS "Sync complete" dialog even when Anki is hidden.
         with self.lock:
             self._anki_dirty = True
-            if self._anki_sync_timer:
-                self._anki_sync_timer.cancel()
-
-            t = threading.Timer(10.0, self.flush_anki_sync, kwargs={"only_if_dirty": True})
-            t.daemon = True
-            t.start()
-            self._anki_sync_timer = t
 
     def _study_stats_locked(self) -> dict[str, int]:
         today = datetime.now().strftime("%Y-%m-%d")
